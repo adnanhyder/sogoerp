@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { LoadingSpinner } from "./loading-spinner";
 
 type LoginFormProps = {
   initialEmail?: string;
@@ -158,7 +159,7 @@ export function LoginForm({ initialEmail = "", notice = "" }: LoginFormProps) {
           />
           Remember me
         </label>
-        <a className="font-semibold text-black" href="#">
+        <a className="font-semibold text-black" href="/forgot-password">
           Forgot password?
         </a>
       </div>
@@ -168,8 +169,9 @@ export function LoginForm({ initialEmail = "", notice = "" }: LoginFormProps) {
         disabled={loading}
         type="submit"
       >
-        {loading ? "Logging in" : "Login"}
-        <ArrowRight className="size-4" />
+        {loading ? <LoadingSpinner /> : null}
+        {loading ? "Processing login" : "Login"}
+        {loading ? null : <ArrowRight className="size-4" />}
       </button>
     </form>
   );

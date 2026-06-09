@@ -29,7 +29,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <AuthBackground>
       <section className="auth-content grid w-full max-w-[1180px] items-center gap-8 lg:grid-cols-[0.92fr_1.08fr]">
-        <div className="hidden min-h-fit! lg:gap-[50px] p-3 pr-10 lg:flex lg:flex-col lg:justify-between">
+        <div className="hidden min-h-[600px] p-3 pr-10 lg:flex lg:flex-col lg:justify-between">
           <Link className="flex items-center gap-3" href="/login">
             <div className="grid size-8 place-items-center rounded-[6px] bg-black text-white">
               <Gauge className="size-5" strokeWidth={2.4} />
@@ -39,22 +39,21 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </span>
           </Link>
 
-          <div className="auth-copy-text">
+          <div className="auth-info-box auth-copy-text">
             <p className="text-sm font-medium text-[#777777]">GPS Tracking ERP</p>
-            <h1 className="mt-3 max-w-sm text-[38px] font-bold leading-[1.05] tracking-[-0.02em] text-black">
+            <h1 className="mt-3 max-w-sm text-[58px] font-bold leading-[1.05] tracking-[-0.02em] text-black">
               Control operations from one calm workspace.
             </h1>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {["Sales", "Service", "Finance"].map((item) => (
-              <div
-                className="auth-ghost-card rounded-[8px] border border-black/15 p-4 text-sm font-semibold text-black"
-                key={item}
-              >
-                {item}
-              </div>
-            ))}
+            <div className="mt-8 grid grid-cols-3 gap-2">
+              {["Sales", "Service", "Finance"].map((item) => (
+                <div
+                  className="rounded-[8px] border border-black/15 p-4 text-sm font-semibold text-black"
+                  key={item}
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

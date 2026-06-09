@@ -60,21 +60,21 @@ export default async function SignupPage() {
             </span>
           </Link>
 
-          <div className="auth-ghost-card rounded-[8px] border border-black/15 p-6">
+          <div className="auth-info-box p-6">
             <p className="text-sm font-medium text-[#777777]">Workspace setup</p>
             <p className="mt-3 text-[42px] font-bold leading-none tracking-[-0.02em] text-black">
               01
             </p>
           </div>
 
-          <div className="auth-copy-text">
+          <div className="auth-info-box auth-copy-text">
             <h2 className="max-w-sm text-[38px] font-bold leading-[1.05] tracking-[-0.02em] text-black">
               Built for teams that install, monitor, and bill fleets.
             </h2>
             <div className="mt-8 grid grid-cols-2 gap-2">
               {["Users", "Vehicles", "Invoices", "Tickets"].map((item) => (
                 <div
-                  className="auth-ghost-card rounded-[8px] border border-black/15 p-4 text-sm font-semibold text-black"
+                  className="rounded-[8px] border border-black/15 p-4 text-sm font-semibold text-black"
                   key={item}
                 >
                   {item}
