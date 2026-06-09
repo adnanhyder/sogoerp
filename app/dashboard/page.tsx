@@ -9,7 +9,6 @@ import {
   CreditCard,
   Gauge,
   Home,
-  LogOut,
   MapPinned,
   MessageSquareText,
   Search,
@@ -20,6 +19,7 @@ import {
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { LogoutButton } from "../_components/logout-button";
 
 const menuItems = [
   { label: "Dashboard", icon: Home, active: true },
@@ -118,13 +118,7 @@ export default async function DashboardPage() {
             </div>
           </nav>
 
-          <a
-            className="mb-9 flex h-12 items-center gap-4 px-9 text-sm font-medium text-[#777777] hover:text-black"
-            href="/login"
-          >
-            <LogOut className="size-[19px]" strokeWidth={1.8} />
-            Log Out
-          </a>
+          <LogoutButton />
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col bg-white">
