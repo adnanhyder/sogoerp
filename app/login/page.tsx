@@ -29,7 +29,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <AuthBackground>
       <section className="auth-content grid w-full max-w-[1180px] items-center gap-8 lg:grid-cols-[0.92fr_1.08fr]">
-        <div className="hidden min-h-[600px] p-3 pr-10 lg:flex lg:flex-col lg:justify-between">
+        <div
+          className="hidden min-h-[600px] box-border bg-transparent p-7 pr-10 lg:flex lg:flex-col lg:justify-between"
+          style={{
+            borderRadius: "12px",
+            clipPath: "polygon(0% 0%, 68% 0%, 68% 8%, 100% 8%, 100% 100%, 0% 100%)",
+          }}
+        >
+
+
           <Link className="flex items-center gap-3" href="/login">
             <div className="grid size-8 place-items-center rounded-[6px] bg-black text-white">
               <Gauge className="size-5" strokeWidth={2.4} />
