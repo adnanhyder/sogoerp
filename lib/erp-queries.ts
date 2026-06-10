@@ -458,7 +458,7 @@ export async function getModuleData(
           error: null,
         };
       case "technicians":
-        return moduleQuery(supabase, "technicians", ["name", "area_coverage", "phone", "commission_rate", "active", "created_at"]);
+        return moduleQuery(supabase, "technicians", ["name", "cities", "phone", "authorization_person_name", "authorization_person_phone", "commission_rate", "created_at"]);
       case "customers":
         return moduleQuery(supabase, "customers", ["full_name", "phone", "whatsapp", "area", "created_at"]);
       case "simConfig":

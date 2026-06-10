@@ -61,7 +61,7 @@ export const moduleConfigs = {
       { label: "Proof Pending", value: "08", detail: "Need images/signature" },
       { label: "Avg Install Time", value: "52m", detail: "Across this week" },
     ],
-    tableColumns: ["Technician", "Area", "Phone", "Commission", "Active", "Created At"],
+    tableColumns: ["Technician", "Cities", "Phone", "Authorized By", "Auth Phone", "Commission", "Created At"],
     tableRows: [
       ["Ali Raza", "Johar / Gulshan", "07", "$12/install", "Active"],
       ["Hamza Field", "Korangi", "05", "$10/install", "On route"],
