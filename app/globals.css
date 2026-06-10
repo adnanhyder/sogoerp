@@ -146,14 +146,8 @@ a {
 
 .auth-info-box {
   position: relative;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  border-radius: 8px;
   background: transparent;
   padding: 26px;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.68) inset,
-    0 18px 44px rgba(255, 255, 255, 0.4),
-    0 12px 36px rgba(0, 0, 0, 0.08);
 }
 
 .auth-info-box::before {
@@ -163,7 +157,7 @@ a {
   width: 58px;
   height: 3px;
   border-radius: 999px;
-  background: #000000;
+  background: transparent;
   content: "";
 }
 
@@ -337,6 +331,18 @@ a {
     0 8px 18px rgba(0, 0, 0, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
   animation: ios-alert-in 220ms ease-out;
+}
+
+.auth-phone-signal.auth-ios-alert-error {
+	position: absolute;
+	left: 163px;
+	top: 30px;
+}
+
+.auth-phone-signal.auth-ios-alert-success {
+	position: absolute !important;
+	left: 163px !important;
+	top: 30px !important;
 }
 
 .auth-form-message {

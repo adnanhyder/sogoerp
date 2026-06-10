@@ -3,7 +3,7 @@ export type CreateField = {
   name: string;
   options?: readonly string[];
   required?: boolean;
-  type: "checkbox" | "date" | "number" | "select" | "text";
+  type: "checkbox" | "date" | "datetime-local" | "number" | "select" | "text";
 };
 
 export type CreateConfig = {
@@ -30,6 +30,7 @@ export const createConfigs = {
       { label: "Phone", name: "phone", type: "text" },
       { label: "WhatsApp", name: "whatsapp", type: "text" },
       { label: "Area", name: "area", type: "text" },
+      { label: "Created Date & Time", name: "created_at", type: "datetime-local" },
     ],
   },
   documents: {
@@ -62,30 +63,17 @@ export const createConfigs = {
     table: "devices",
     fields: [
       { label: "IMEI", name: "imei", required: true, type: "text" },
+      { label: "Device Status", name: "status", type: "text" },
       {
-        label: "Status",
-        name: "status",
-        options: [
-          "draft",
-          "purchased",
-          "stock_added",
-          "imei_registered",
-          "imei_approved",
-          "assigned_to_courier",
-          "received_by_technician",
-          "assigned_for_installation",
-          "installed",
-          "activated_with_sim",
-          "active",
-          "returned",
-          "faulty",
-          "replaced",
-        ],
+        label: "Custody",
+        name: "custody_status",
+        options: ["company_hands", "on_the_way", "received_by_technician"],
         required: true,
         type: "select",
       },
       { label: "Purchase Cost", name: "purchase_cost", type: "number" },
-      { label: "Sale Price", name: "sale_price", type: "number" },
+      { label: "With Mic", name: "has_mic", type: "checkbox" },
+      { label: "Added Date & Time", name: "created_at", type: "datetime-local" },
     ],
   },
   integrations: {
@@ -119,6 +107,8 @@ export const createConfigs = {
         ],
         type: "select",
       },
+      { label: "Next Follow-up Date & Time", name: "next_follow_up_at", type: "datetime-local" },
+      { label: "Created Date & Time", name: "created_at", type: "datetime-local" },
     ],
   },
   simConfig: {
@@ -153,6 +143,7 @@ export const createConfigs = {
       { label: "Phone", name: "phone", type: "text" },
       { label: "Area Coverage", name: "area_coverage", type: "text" },
       { label: "Commission Rate", name: "commission_rate", type: "number" },
+      { label: "Created Date & Time", name: "created_at", type: "datetime-local" },
     ],
   },
   insurance: {

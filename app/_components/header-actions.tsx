@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { LoadingSpinner } from "./loading-spinner";
 
@@ -35,6 +37,35 @@ function useClickAway<T extends HTMLElement>(onAway: () => void) {
   }, [onAway]);
 
   return ref;
+}
+
+function LogoutButton() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  async function handleLogout() {
+    setLoading(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
+
+  return (
+    <button
+      className="flex w-full items-center gap-2 text-sm font-semibold text-red-500 transition hover:text-red-600 disabled:opacity-50"
+      disabled={loading}
+      onClick={handleLogout}
+      type="button"
+    >
+      {loading ? (
+        <LoadingSpinner className="size-4" />
+      ) : (
+        <LogOut className="size-4" strokeWidth={1.7} />
+      )}
+      {loading ? "Signing out..." : "Sign out"}
+    </button>
+  );
 }
 
 export function HeaderActions({ displayName, initials, user }: HeaderActionsProps) {
@@ -187,6 +218,9 @@ export function HeaderActions({ displayName, initials, user }: HeaderActionsProp
               <div>
                 <dt className="font-medium text-[#777777]">User ID</dt>
                 <dd className="mt-1 break-all font-semibold text-black">{user.id}</dd>
+              </div>
+              <div>
+                <LogoutButton />
               </div>
             </dl>
           </div>

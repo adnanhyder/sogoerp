@@ -25,20 +25,26 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   if (user) {
     redirect("/dashboard");
   }
+  
 
   return (
     <AuthBackground>
       <section className="auth-content grid w-full max-w-[1180px] items-center gap-8 lg:grid-cols-[0.92fr_1.08fr]">
         <div
-          className="hidden min-h-[600px] box-border bg-transparent p-7 pr-10 lg:flex lg:flex-col lg:justify-between"
-          style={{
-            borderRadius: "12px",
-            clipPath: "polygon(0% 0%, 68% 0%, 68% 8%, 100% 8%, 100% 100%, 0% 100%)",
-          }}
-        >
-
-
-          <Link className="flex items-center gap-3" href="/login">
+          className="hidden min-h-[600px] p-3 pr-10 lg:flex lg:flex-col lg:justify-between w-full"
+            style={{
+              clipPath: "url(#notched-card)",
+              backgroundColor: "#ffffff",
+            }}
+          >
+          <svg width="0" height="0" style={{ position: "absolute", overflow: "hidden" }}>
+            <defs>
+              <clipPath id="notched-card" clipPathUnits="objectBoundingBox">
+              <path d="M0.032,0 L0.62,0 Q0.635,0 0.644,0.008 L0.718,0.057 Q0.727,0.065 0.742,0.065 L0.968,0.065 Q1,0.065 1,0.095 L1,0.968 Q1,1 0.968,1 L0.032,1 Q0,1 0,0.968 L0,0.032 Q0,0 0.032,0 Z" />
+              </clipPath>
+            </defs>
+          </svg>
+          <Link className="flex items-center gap-3 mt-[30px] ml-[25px]" href="/login">
             <div className="grid size-8 place-items-center rounded-[6px] bg-black text-white">
               <Gauge className="size-5" strokeWidth={2.4} />
             </div>
@@ -55,7 +61,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <div className="mt-8 grid grid-cols-3 gap-2">
               {["Sales", "Service", "Finance"].map((item) => (
                 <div
-                  className="rounded-[8px] border border-black/15 p-4 text-sm font-semibold text-black"
+                  className="rounded-[8px] bg-[#000000] border border-black/15 p-4 text-sm font-semibold text-[#ffffff]"
                   key={item}
                 >
                   {item}

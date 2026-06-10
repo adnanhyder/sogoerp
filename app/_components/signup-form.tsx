@@ -34,9 +34,8 @@ export function SignupForm() {
       },
     });
 
-    setLoading(false);
-
     if (signUpError) {
+      setLoading(false);
       const isRateLimit = signUpError.message
         .toLowerCase()
         .includes("rate limit");
@@ -50,6 +49,7 @@ export function SignupForm() {
     }
 
     if (!data.session) {
+      setLoading(false);
       setError(
         "Account was not activated by Supabase. Turn off Confirm email in Supabase Auth settings, then register again.",
       );

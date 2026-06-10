@@ -143,13 +143,19 @@ begin
     imei,
     purchase_cost,
     sale_price,
-    status
+    status,
+    has_mic,
+    custody_status,
+    custody_updated_at
   )
   values (
     payload ->> 'imei',
     coalesce(nullif(payload ->> 'purchase_cost', '')::numeric, 0),
     coalesce(nullif(payload ->> 'sale_price', '')::numeric, 0),
-    coalesce((payload ->> 'status')::public.device_status, 'stock_added')
+    coalesce(nullif(payload ->> 'status', ''), 'stock_added'),
+    coalesce((payload ->> 'has_mic')::boolean, false),
+    coalesce(nullif(payload ->> 'custody_status', ''), 'company_hands'),
+    coalesce(nullif(payload ->> 'custody_updated_at', '')::timestamptz, now())
   )
   returning id into created_id;
 

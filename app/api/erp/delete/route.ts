@@ -32,13 +32,6 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: lookupError.message }, { status: 400 });
   }
 
-  if (record.status !== "purchased") {
-    return NextResponse.json(
-      { error: "Only purchased inventory records can be deleted." },
-      { status: 400 },
-    );
-  }
-
   const { error } = await supabase.from(config.table).delete().eq("id", body.id);
 
   if (error) {

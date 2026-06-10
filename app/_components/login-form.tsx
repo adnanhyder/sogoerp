@@ -76,9 +76,8 @@ export function LoginForm({ initialEmail = "", notice = "" }: LoginFormProps) {
       password,
     });
 
-    setLoading(false);
-
     if (signInError) {
+      setLoading(false);
       const message = signInError.message.toLowerCase();
 
       setError(

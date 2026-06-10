@@ -2,8 +2,9 @@ import Link from "next/link";
 import { Gauge } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { erpModules } from "@/lib/erp-data";
+import { ContentRouteLoader } from "./content-route-loader";
 import { HeaderActions } from "./header-actions";
-import { LogoutButton } from "./logout-button";
+
 
 type ErpShellProps = {
   activeHref: string;
@@ -12,6 +13,20 @@ type ErpShellProps = {
   title: string;
   user: User;
 };
+
+const hiddenAsideHrefs = new Set([
+  "/sim-config",
+  "/finance",
+  "/commissions",
+  "/whatsapp",
+  "/support",
+  "/insurance",
+  "/reports",
+  "/documents",
+  "/tracking",
+  "/integrations",
+  "/settings",
+]);
 
 function Logo() {
   return (
@@ -55,7 +70,7 @@ export function ErpShell({
           <nav className="flex-1 overflow-y-auto pb-5">
             <p className="px-8 pb-3 text-sm font-medium text-[#343434]">Modules</p>
             <div className="space-y-1">
-              {erpModules.map((item) => {
+              {erpModules.filter((item) => !hiddenAsideHrefs.has(item.href)).map((item) => {
                 const Icon = item.icon;
                 const active = item.href === activeHref;
 
@@ -79,8 +94,6 @@ export function ErpShell({
               })}
             </div>
           </nav>
-
-          <LogoutButton />
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col bg-[#fbfbfb]">
@@ -101,7 +114,9 @@ export function ErpShell({
             <HeaderActions displayName={displayName} initials={initials} user={user} />
           </header>
 
-          <div className="flex-1 px-5 py-5 sm:px-8 lg:px-10">{children}</div>
+          <div className="flex-1 px-5 py-5 sm:px-8 lg:px-10">
+            <ContentRouteLoader>{children}</ContentRouteLoader>
+          </div>
         </div>
       </section>
     </main>

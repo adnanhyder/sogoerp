@@ -12,6 +12,10 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 const statIcons = [Activity, ClipboardList, Car, CalendarDays];
+const adminFlowHrefs = ["/inventory", "/leads", "/technicians", "/customers"];
+const adminFlowModules = adminFlowHrefs
+  .map((href) => erpModules.find((module) => module.href === href))
+  .filter((module): module is NonNullable<typeof module> => Boolean(module));
 const chartWidth = 720;
 const chartHeight = 260;
 const chartPadding = 24;
@@ -334,7 +338,7 @@ export default async function DashboardPage() {
         </section>
 
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {erpModules.slice(1, 9).map((module) => {
+          {adminFlowModules.map((module) => {
             const Icon = module.icon;
 
             return (

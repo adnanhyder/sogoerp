@@ -11,7 +11,7 @@ export const moduleConfigs = {
       { label: "In Transit", value: "38", detail: "Courier / technician handoff" },
       { label: "Faulty", value: "17", detail: "Pending replacement" },
     ],
-    tableColumns: ["IMEI", "Status", "Purchase Cost", "Sale Price", "Created", "Actions"],
+    tableColumns: ["IMEI", "Device Status", "Custody", "Mic", "Purchase Cost", "Added At", "Actions"],
     tableRows: [
       ["865742091234567", "IMEI Approved", "Unassigned", "-", "-"],
       ["865742091234611", "With Technician", "Hamza Field", "-", "-"],
@@ -36,7 +36,7 @@ export const moduleConfigs = {
       { label: "Matured Leads", value: "18", detail: "Ready to schedule" },
       { label: "Conversion", value: "24%", detail: "+3.1% this month" },
     ],
-    tableColumns: ["Lead", "Source", "Stage", "Assigned To", "Next Follow-up"],
+    tableColumns: ["Lead", "Source", "Stage", "Phone", "Next Follow-up", "Created At"],
     tableRows: [
       ["Ahmed Transport", "Facebook Ads", "Interested", "Sara Sales", "Today 4:00 PM"],
       ["Zain Courier", "WhatsApp", "Negotiation", "Usman Sales", "Tomorrow"],
@@ -61,7 +61,7 @@ export const moduleConfigs = {
       { label: "Proof Pending", value: "08", detail: "Need images/signature" },
       { label: "Avg Install Time", value: "52m", detail: "Across this week" },
     ],
-    tableColumns: ["Technician", "Area", "Jobs", "Commission", "Status"],
+    tableColumns: ["Technician", "Area", "Phone", "Commission", "Active", "Created At"],
     tableRows: [
       ["Ali Raza", "Johar / Gulshan", "07", "$12/install", "Active"],
       ["Hamza Field", "Korangi", "05", "$10/install", "On route"],
@@ -86,7 +86,7 @@ export const moduleConfigs = {
       { label: "Renewals Due", value: "64", detail: "Next 30 days" },
       { label: "Open Tickets", value: "28", detail: "6 high priority" },
     ],
-    tableColumns: ["Customer", "Phone", "Vehicles", "Device", "Warranty"],
+    tableColumns: ["Customer", "Phone", "WhatsApp", "Area", "Created At"],
     tableRows: [
       ["Metro Fleet", "0300-1111111", "42", "865742091234688", "Active"],
       ["Al Noor Logistics", "0312-2222222", "18", "Pending Install", "N/A"],

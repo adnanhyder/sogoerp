@@ -7,13 +7,14 @@ import { createClient } from "@/lib/supabase/server";
 
 type ModuleRouteProps = {
   moduleKey: ModuleKey;
+  searchQuery?: string;
 };
 
-export async function ModuleRoute({ moduleKey }: ModuleRouteProps) {
+export async function ModuleRoute({ moduleKey, searchQuery = "" }: ModuleRouteProps) {
   const user = await requireUser();
   const supabase = await createClient();
   const config = moduleConfigs[moduleKey];
-  const moduleData = await getModuleData(supabase, moduleKey);
+  const moduleData = await getModuleData(supabase, moduleKey, { searchQuery });
   const createConfig = createConfigs[moduleKey as CreateModuleKey];
 
   return (
@@ -23,6 +24,7 @@ export async function ModuleRoute({ moduleKey }: ModuleRouteProps) {
       databaseError={moduleData.error}
       metrics={moduleData.data.metrics}
       tableRows={moduleData.data.rows}
+      searchQuery={searchQuery}
       user={user}
     />
   );

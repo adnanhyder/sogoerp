@@ -55,6 +55,13 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
 });
 
+const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  month: "short",
+});
+
 function formatCount(value: number | null | undefined) {
   return new Intl.NumberFormat("en-US").format(value ?? 0);
 }
@@ -69,6 +76,14 @@ function formatDate(value: string | null | undefined) {
   }
 
   return dateFormatter.format(new Date(value));
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) {
+    return "-";
+  }
+
+  return dateTimeFormatter.format(new Date(value));
 }
 
 async function countRows(
@@ -398,6 +413,7 @@ async function sumCommissions(supabase: SupabaseClient) {
 export async function getModuleData(
   supabase: SupabaseClient,
   key: string,
+  options: { searchQuery?: string } = {},
 ): Promise<QueryResult<ModuleData>> {
   try {
     switch (key) {
@@ -406,11 +422,12 @@ export async function getModuleData(
           data: {
             metrics: [
               { label: "Total Stock", value: formatCount(await countRows(supabase, "devices")), detail: "All device records" },
-              { label: "Available", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("status", "stock_added"))), detail: "Ready for assignment" },
-              { label: "In Transit", value: formatCount(await countRows(supabase, "devices", (query) => query.in("status", ["assigned_to_courier", "received_by_technician"]))), detail: "Courier / technician handoff" },
+              { label: "Company Hands", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("custody_status", "company_hands"))), detail: "Devices still with company" },
+              { label: "On The Way", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("custody_status", "on_the_way"))), detail: "Courier / technician handoff" },
+              { label: "With Technicians", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("custody_status", "received_by_technician"))), detail: "Received by technicians" },
               { label: "Faulty", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("status", "faulty"))), detail: "Pending replacement" },
             ],
-            rows: await tableRows(supabase, "devices", ["id", "imei", "status", "purchase_cost", "sale_price", "created_at"]),
+            rows: await inventoryRows(supabase, options.searchQuery),
           },
           error: null,
         };
@@ -436,12 +453,12 @@ export async function getModuleData(
               { label: "Matured Leads", value: formatCount(await countRows(supabase, "leads", (query) => query.eq("stage", "matured"))), detail: "Ready to schedule" },
               { label: "Total Leads", value: formatCount(await countRows(supabase, "leads")), detail: "All lead records" },
             ],
-            rows: await tableRows(supabase, "leads", ["name", "source", "stage", "phone", "next_follow_up_at"]),
+            rows: await tableRows(supabase, "leads", ["name", "source", "stage", "phone", "next_follow_up_at", "created_at"]),
           },
           error: null,
         };
       case "technicians":
-        return moduleQuery(supabase, "technicians", ["name", "area_coverage", "phone", "commission_rate", "active"]);
+        return moduleQuery(supabase, "technicians", ["name", "area_coverage", "phone", "commission_rate", "active", "created_at"]);
       case "customers":
         return moduleQuery(supabase, "customers", ["full_name", "phone", "whatsapp", "area", "created_at"]);
       case "simConfig":
@@ -508,6 +525,51 @@ export async function getModuleData(
   }
 }
 
+function displayDeviceStatus(value: unknown) {
+  const status = String(value ?? "").trim();
+  const normalized = status.toLowerCase();
+
+  if (!status || normalized === "purchased" || normalized === "stock_added") {
+    return "Clear";
+  }
+
+  return status.replaceAll("_", " ");
+}
+
+async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
+  let query = supabase
+    .from("devices")
+    .select("id,imei,status,custody_status,has_mic,purchase_cost,created_at")
+    .order("created_at", { ascending: false });
+
+  const trimmedSearch = searchQuery.trim();
+
+  if (trimmedSearch) {
+    const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
+    query = query.or(
+      `imei.ilike.%${escapedSearch}%,status.ilike.%${escapedSearch}%,custody_status.ilike.%${escapedSearch}%`,
+    );
+  }
+
+  const { data, error } = await query.limit(trimmedSearch ? 50 : 10);
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => [
+      String(row.id ?? ""),
+      String(row.status ?? "-").replaceAll("_", " "),
+      String(row.custody_status ?? "company_hands"),
+      String(row.imei ?? "-"),
+      displayDeviceStatus(row.status),
+      String(row.custody_status ?? "company_hands").replaceAll("_", " "),
+      row.has_mic ? "Yes" : "No",
+      String(row.purchase_cost ?? "0"),
+      formatDateTime(String(row.created_at ?? "")),
+    ]);
+}
+
 async function moduleQuery(supabase: SupabaseClient, table: string, columns: string[]) {
   const count = await countRows(supabase, table);
 
@@ -544,7 +606,11 @@ async function tableRows(supabase: SupabaseClient, table: string, columns: strin
         return "-";
       }
 
-      if (column.includes("_at") || column.includes("_on") || column.includes("date")) {
+      if (column.includes("_at")) {
+        return formatDateTime(String(value));
+      }
+
+      if (column.includes("_on") || column.includes("date")) {
         return formatDate(String(value));
       }
 
