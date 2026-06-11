@@ -11,7 +11,7 @@ export const moduleConfigs = {
       { label: "In Transit", value: "38", detail: "Courier / technician handoff" },
       { label: "Faulty", value: "17", detail: "Pending replacement" },
     ],
-    tableColumns: ["IMEI", "Device Status", "Custody", "Mic", "Purchase Cost", "Added At", "Actions"],
+    tableColumns: ["IMEI", "Device Status", "Custody", "Mic", "Technician", "City", "Tech Devices", "Purchase Cost", "Added At", "Actions"],
     tableRows: [
       ["865742091234567", "IMEI Approved", "Unassigned", "-", "-"],
       ["865742091234611", "With Technician", "Hamza Field", "-", "-"],
@@ -61,7 +61,7 @@ export const moduleConfigs = {
       { label: "Proof Pending", value: "08", detail: "Need images/signature" },
       { label: "Avg Install Time", value: "52m", detail: "Across this week" },
     ],
-    tableColumns: ["Technician", "CNIC", "Cities", "Phone", "Authorized By", "Auth Phone", "Commission", "Status", "Created At", "Actions"],
+    tableColumns: ["Technician", "CNIC", "Cities", "Phone", "Devices", "To Install", "Queue", "Disputed", "Authorized By", "Commission", "Status", "Created At", "Actions"],
     tableRows: [
       ["Ali Raza", "Johar / Gulshan", "07", "$12/install", "Active"],
       ["Hamza Field", "Korangi", "05", "$10/install", "On route"],

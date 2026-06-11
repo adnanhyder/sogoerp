@@ -3,7 +3,7 @@ export type CreateField = {
   name: string;
   options?: readonly string[];
   required?: boolean;
-  type: "checkbox" | "date" | "datetime-local" | "number" | "select" | "text";
+  type: "checkbox" | "date" | "datetime-local" | "number" | "select" | "technician-select" | "text";
 };
 
 export type CreateConfig = {
@@ -73,6 +73,7 @@ export const createConfigs = {
       },
       { label: "Purchase Cost", name: "purchase_cost", type: "number" },
       { label: "With Mic", name: "has_mic", type: "checkbox" },
+      { label: "Received By Technician", name: "technician_id", type: "technician-select" },
       { label: "Added Date & Time", name: "created_at", type: "datetime-local" },
     ],
   },

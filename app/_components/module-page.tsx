@@ -112,11 +112,11 @@ export function ModulePage({
       );
     }
 
-    if (index === 4) {
+    if (index === 4 || index === 6 || index === 7) {
       return <span className="font-bold tabular-nums text-black">{cell}</span>;
     }
 
-    if (index === 5) {
+    if (index === 5 || index === 8) {
       return <span className="text-xs font-semibold text-[#777777]">{cell}</span>;
     }
 
@@ -149,13 +149,14 @@ export function ModulePage({
         <tbody>
           {tableRows.length ? (
             tableRows.map((row) => {
-              const visibleCells = isInventory ? row.slice(3) : isTechnicians ? row.slice(5) : row;
+              const visibleCells = isInventory ? row.slice(4) : isTechnicians ? row.slice(6) : row;
               const inventoryId = row[0] ?? "";
               const inventoryStatus = row[1] ?? "";
               const inventoryCustodyStatus = row[2] ?? "company_hands";
-              const inventoryImei = row[3] ?? "";
-              const inventoryHasMic = row[6] ?? "No";
-              const inventoryPurchaseCost = row[7] ?? "0";
+              const inventoryTechnicianId = row[3] ?? "";
+              const inventoryImei = row[4] ?? "";
+              const inventoryHasMic = row[7] ?? "No";
+              const inventoryPurchaseCost = row[11] ?? "0";
               const technicianId = row[0] ?? "";
               const technicianActive = row[1] === "true";
               const technicianDisputed = row[2] === "true";
@@ -190,6 +191,7 @@ export function ModulePage({
                         imei={inventoryImei}
                         purchaseCost={inventoryPurchaseCost}
                         status={inventoryStatus}
+                        technicianId={inventoryTechnicianId}
                       />
                     </td>
                   ) : null}
@@ -198,16 +200,16 @@ export function ModulePage({
                       <TechnicianRecordActions
                         active={technicianActive}
                         authorizationPersonCnic={technicianAuthCnic}
-                        authorizationPersonName={row[9] ?? ""}
-                        authorizationPersonPhone={row[10] ?? ""}
+                        authorizationPersonName={row[14] ?? ""}
+                        authorizationPersonPhone={row[5] ?? ""}
                         authorizationRelation={technicianAuthRelation}
-                        cities={row[7] ?? ""}
-                        cnic={row[6] ?? ""}
-                        commissionRate={row[11] ?? "0"}
+                        cities={row[8] ?? ""}
+                        cnic={row[7] ?? ""}
+                        commissionRate={row[15] ?? "0"}
                         disputed={technicianDisputed}
                         id={technicianId}
-                        name={row[5] ?? ""}
-                        phone={row[8] ?? ""}
+                        name={row[6] ?? ""}
+                        phone={row[9] ?? ""}
                       />
                     </td>
                   ) : null}

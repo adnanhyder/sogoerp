@@ -228,6 +228,7 @@ create table public.commissions (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid references public.organizations(id) on delete cascade,
   profile_id uuid references public.profiles(id) on delete cascade,
+  technician_id uuid references public.technicians(id) on delete set null,
   work_order_id uuid references public.work_orders(id) on delete set null,
   amount numeric(12,2) not null,
   reason text,

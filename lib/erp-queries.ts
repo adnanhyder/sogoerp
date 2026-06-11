@@ -179,7 +179,7 @@ export async function getDashboardData(
         rows: [
           ["Revenue", "$0"],
           ["Expenses", "$0"],
-          ["Commissions", "$0"],
+          ["Pay Technicians", "$0"],
           ["Net Profit", "$0"],
         ],
       },
@@ -244,9 +244,7 @@ export async function getDashboardData(
       sumCommissions(supabase),
       countRows(supabase, "devices", (query) => query.eq("status", "purchased")),
       countRows(supabase, "devices", (query) => query.eq("status", "imei_approved")),
-      countRows(supabase, "devices", (query) =>
-        query.in("status", ["assigned_to_courier", "received_by_technician"]),
-      ),
+      countRows(supabase, "devices", (query) => query.eq("custody_status", "received_by_technician")),
       countRows(supabase, "devices", (query) =>
         query.in("status", ["installed", "activated_with_sim", "active"]),
       ),
@@ -367,7 +365,7 @@ export async function getDashboardData(
             rows: [
               ["Revenue", formatMoney(monthlyIncome)],
               ["Expenses", formatMoney(monthlyExpenses)],
-              ["Commissions", formatMoney(totalCommissions)],
+              ["Pay Technicians", formatMoney(totalCommissions)],
               ["Net Profit", formatMoney(netProfit)],
             ],
           },
@@ -550,7 +548,7 @@ function displayDeviceStatus(value: unknown) {
 async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
   let query = supabase
     .from("devices")
-    .select("id,imei,status,custody_status,has_mic,purchase_cost,created_at")
+    .select("id,imei,status,custody_status,has_mic,purchase_cost,created_at,technician_id,technicians(name,cities)")
     .order("created_at", { ascending: false });
 
   const trimmedSearch = searchQuery.trim();
@@ -568,17 +566,35 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
     throw error;
   }
 
-  return ((data ?? []) as Record<string, unknown>[]).map((row) => [
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const technicianIds = Array.from(
+    new Set(
+      rows
+        .map((row) => row.technician_id)
+        .filter((value): value is string => typeof value === "string" && value.length > 0),
+    ),
+  );
+  const technicianDeviceCounts = await deviceCountsByTechnician(supabase, technicianIds);
+
+  return rows.map((row) => {
+    const technicianId = typeof row.technician_id === "string" ? row.technician_id : "";
+
+    return [
       String(row.id ?? ""),
       String(row.status ?? "-").replaceAll("_", " "),
       String(row.custody_status ?? "company_hands"),
+      technicianId,
       String(row.imei ?? "-"),
       displayDeviceStatus(row.status),
       String(row.custody_status ?? "company_hands").replaceAll("_", " "),
       row.has_mic ? "Yes" : "No",
+      relatedField(row.technicians, "name") ?? "-",
+      relatedField(row.technicians, "cities") ?? "-",
+      technicianId ? formatCount(technicianDeviceCounts.get(technicianId)) : "0",
       String(row.purchase_cost ?? "0"),
       formatDateTime(String(row.created_at ?? "")),
-    ]);
+    ];
+  });
 }
 
 function technicianStatus(active: unknown, disputed: unknown) {
@@ -600,22 +616,148 @@ async function technicianRows(supabase: SupabaseClient) {
     throw error;
   }
 
-  return ((data ?? []) as Record<string, unknown>[]).map((row) => [
-    String(row.id ?? ""),
-    row.active ? "true" : "false",
-    row.disputed ? "true" : "false",
-    String(row.authorization_person_cnic ?? ""),
-    String(row.authorization_relation ?? ""),
-    String(row.name ?? "-"),
-    String(row.cnic ?? "-"),
-    String(row.cities ?? "-"),
-    String(row.phone ?? "-"),
-    String(row.authorization_person_name ?? "-"),
-    String(row.authorization_person_phone ?? "-"),
-    String(row.commission_rate ?? "0"),
-    technicianStatus(row.active, row.disputed),
-    formatDateTime(String(row.created_at ?? "")),
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const technicianIds = rows.map((row) => String(row.id ?? "")).filter(Boolean);
+  const [deviceCounts, toInstallCounts, queueCounts, disputedCounts] = await Promise.all([
+    deviceCountsByTechnician(supabase, technicianIds),
+    deviceToInstallCountsByTechnician(supabase, technicianIds),
+    workOrderCountsByTechnician(supabase, technicianIds, ["assigned", "scheduled"]),
+    disputedDeviceCountsByTechnician(supabase, technicianIds),
   ]);
+
+  return rows.map((row) => {
+    const technicianId = String(row.id ?? "");
+
+    return [
+      String(row.id ?? ""),
+      row.active ? "true" : "false",
+      row.disputed ? "true" : "false",
+      String(row.authorization_person_cnic ?? ""),
+      String(row.authorization_relation ?? ""),
+      String(row.authorization_person_phone ?? ""),
+      String(row.name ?? "-"),
+      String(row.cnic ?? "-"),
+      String(row.cities ?? "-"),
+      String(row.phone ?? "-"),
+      formatCount(deviceCounts.get(technicianId)),
+      formatCount(toInstallCounts.get(technicianId)),
+      formatCount(queueCounts.get(technicianId)),
+      formatCount(disputedCounts.get(technicianId)),
+      String(row.authorization_person_name ?? "-"),
+      String(row.commission_rate ?? "0"),
+      technicianStatus(row.active, row.disputed),
+      formatDateTime(String(row.created_at ?? "")),
+    ];
+  });
+}
+
+async function deviceCountsByTechnician(supabase: SupabaseClient, technicianIds: string[]) {
+  const counts = new Map<string, number>();
+
+  if (!technicianIds.length) {
+    return counts;
+  }
+
+  const { data, error } = await supabase
+    .from("devices")
+    .select("technician_id")
+    .in("technician_id", technicianIds);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const row of data ?? []) {
+    const technicianId = String(row.technician_id);
+    counts.set(technicianId, (counts.get(technicianId) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+async function disputedDeviceCountsByTechnician(supabase: SupabaseClient, technicianIds: string[]) {
+  const counts = new Map<string, number>();
+
+  if (!technicianIds.length) {
+    return counts;
+  }
+
+  const { data, error } = await supabase
+    .from("devices")
+    .select("technician_id")
+    .in("technician_id", technicianIds)
+    .ilike("status", "%disputed%");
+
+  if (error) {
+    throw error;
+  }
+
+  for (const row of data ?? []) {
+    const technicianId = String(row.technician_id);
+    counts.set(technicianId, (counts.get(technicianId) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+async function deviceToInstallCountsByTechnician(supabase: SupabaseClient, technicianIds: string[]) {
+  const counts = new Map<string, number>();
+
+  if (!technicianIds.length) {
+    return counts;
+  }
+
+  const { data, error } = await supabase
+    .from("devices")
+    .select("technician_id,status")
+    .in("technician_id", technicianIds)
+    .eq("custody_status", "received_by_technician");
+
+  if (error) {
+    throw error;
+  }
+
+  for (const row of data ?? []) {
+    const status = String(row.status ?? "").toLowerCase();
+
+    if (["installed", "activated_with_sim", "active"].includes(status)) {
+      continue;
+    }
+
+    const technicianId = String(row.technician_id);
+    counts.set(technicianId, (counts.get(technicianId) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+async function workOrderCountsByTechnician(
+  supabase: SupabaseClient,
+  technicianIds: string[],
+  statuses: string[],
+) {
+  const counts = new Map<string, number>();
+
+  if (!technicianIds.length) {
+    return counts;
+  }
+
+  const { data, error } = await supabase
+    .from("work_orders")
+    .select("technician_id")
+    .in("technician_id", technicianIds)
+    .in("status", statuses);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const row of data ?? []) {
+    const technicianId = String(row.technician_id);
+    counts.set(technicianId, (counts.get(technicianId) ?? 0) + 1);
+  }
+
+  return counts;
 }
 
 async function moduleQuery(supabase: SupabaseClient, table: string, columns: string[]) {

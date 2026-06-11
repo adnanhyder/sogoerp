@@ -1,8 +1,8 @@
 "use client";
 
-import { Pencil, Trash2, X } from "lucide-react";
+import { CheckCircle2, Pencil, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LoadingSpinner } from "./loading-spinner";
 
 type InventoryRecordActionsProps = {
@@ -12,6 +12,15 @@ type InventoryRecordActionsProps = {
   imei: string;
   purchaseCost: string;
   status: string;
+  technicianId: string;
+};
+
+type TechnicianOption = {
+  active: boolean;
+  cities: string;
+  deviceCount: number;
+  id: string;
+  name: string;
 };
 
 const custodyOptions = ["company_hands", "on_the_way", "received_by_technician"];
@@ -23,17 +32,52 @@ export function InventoryRecordActions({
   imei,
   purchaseCost,
   status,
+  technicianId,
 }: InventoryRecordActionsProps) {
   const router = useRouter();
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [isInstallOpen, setIsInstallOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
   const [draftImei, setDraftImei] = useState(imei);
   const [draftStatus, setDraftStatus] = useState(status === "-" ? "" : status);
   const [draftCustody, setDraftCustody] = useState(custodyStatus);
   const [draftHasMic, setDraftHasMic] = useState(hasMic);
   const [draftPurchaseCost, setDraftPurchaseCost] = useState(purchaseCost);
+  const [draftTechnicianId, setDraftTechnicianId] = useState(technicianId);
+  const [installSalePrice, setInstallSalePrice] = useState("");
+  const [installCommissionAmount, setInstallCommissionAmount] = useState("");
+  const [installCompletedAt, setInstallCompletedAt] = useState(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  });
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadTechnicians() {
+      const response = await fetch("/api/erp/options/technicians");
+      const payload = (await response.json()) as {
+        error?: string;
+        technicians?: TechnicianOption[];
+      };
+
+      if (!ignore && response.ok) {
+        setTechnicians(payload.technicians ?? []);
+      }
+    }
+
+    loadTechnicians();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   async function saveRecord() {
     setError("");
@@ -49,6 +93,7 @@ export function InventoryRecordActions({
           imei: draftImei,
           purchase_cost: draftPurchaseCost,
           status: draftStatus,
+          technician_id: draftTechnicianId,
         },
       }),
       headers: { "Content-Type": "application/json" },
@@ -64,6 +109,41 @@ export function InventoryRecordActions({
     }
 
     setIsEditing(false);
+    router.refresh();
+  }
+
+  async function markInstallSuccess() {
+    if (!draftTechnicianId) {
+      setError("Select the technician who received this device first.");
+      return;
+    }
+
+    setError("");
+    setSuccessMessage("");
+    setIsInstalling(true);
+
+    const response = await fetch("/api/erp/install-success", {
+      body: JSON.stringify({
+        commissionAmount: installCommissionAmount,
+        completedAt: installCompletedAt,
+        deviceId: id,
+        salePrice: installSalePrice,
+        technicianId: draftTechnicianId,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const payload = (await response.json()) as { error?: string };
+
+    setIsInstalling(false);
+
+    if (!response.ok) {
+      setError(payload.error ?? "Unable to mark this install as successful.");
+      return;
+    }
+
+    setSuccessMessage("Install success recorded. Commission added for admin payment.");
+    setIsInstallOpen(false);
     router.refresh();
   }
 
@@ -97,12 +177,14 @@ export function InventoryRecordActions({
     router.refresh();
   }
 
+  const busy = isSaving || isDeleting || isInstalling;
+
   return (
-    <div className="flex min-w-[220px] flex-col gap-2">
-      <div className="flex gap-2">
+    <div className="flex min-w-[260px] flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           className="inline-flex items-center justify-center gap-1.5 rounded-[6px] border border-[#d2d2d2] bg-white px-3 py-2 text-xs font-bold text-black transition hover:border-black disabled:cursor-wait disabled:opacity-50"
-          disabled={isSaving || isDeleting}
+          disabled={busy}
           onClick={() => {
             setError("");
             setIsEditing((open) => !open);
@@ -113,8 +195,21 @@ export function InventoryRecordActions({
           {isEditing ? "Close" : "Edit"}
         </button>
         <button
+          className="inline-flex items-center justify-center gap-1.5 rounded-[6px] border border-green-200 bg-green-50 px-3 py-2 text-xs font-bold text-green-700 transition hover:border-green-500 disabled:cursor-wait disabled:opacity-50"
+          disabled={busy}
+          onClick={() => {
+            setError("");
+            setSuccessMessage("");
+            setIsInstallOpen((open) => !open);
+          }}
+          type="button"
+        >
+          {isInstalling ? <LoadingSpinner className="size-3" /> : <CheckCircle2 className="size-3" />}
+          Success
+        </button>
+        <button
           className="inline-flex items-center justify-center gap-1.5 rounded-[6px] bg-black px-3 py-2 text-xs font-bold text-white transition hover:bg-[#343434] disabled:cursor-wait disabled:opacity-50"
-          disabled={isSaving || isDeleting}
+          disabled={busy}
           onClick={deleteRecord}
           type="button"
         >
@@ -158,6 +253,21 @@ export function InventoryRecordActions({
               </select>
             </label>
             <label className="text-xs font-bold text-black">
+              Received By Technician
+              <select
+                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] bg-white px-2 text-xs font-medium outline-none focus:border-black"
+                onChange={(event) => setDraftTechnicianId(event.target.value)}
+                value={draftTechnicianId}
+              >
+                <option value="">No technician selected</option>
+                {technicians.map((technician) => (
+                  <option disabled={!technician.active} key={technician.id} value={technician.id}>
+                    {technician.name} / {technician.cities || "No city"} / {technician.deviceCount} devices
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-bold text-black">
               Purchase Cost
               <input
                 className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-medium outline-none focus:border-black"
@@ -178,7 +288,7 @@ export function InventoryRecordActions({
             </label>
             <button
               className="inline-flex h-9 items-center justify-center gap-2 rounded-[6px] bg-black px-3 text-xs font-bold text-white disabled:cursor-wait disabled:bg-[#343434]"
-              disabled={isSaving || isDeleting}
+              disabled={busy}
               onClick={saveRecord}
               type="button"
             >
@@ -189,7 +299,68 @@ export function InventoryRecordActions({
         </div>
       ) : null}
 
+      {isInstallOpen ? (
+        <div className="w-[300px] rounded-[8px] border border-green-200 bg-white p-3 shadow-[0_14px_35px_rgba(0,0,0,0.12)]">
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-black">
+              Installed By
+              <select
+                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] bg-white px-2 text-xs font-medium outline-none focus:border-black"
+                onChange={(event) => setDraftTechnicianId(event.target.value)}
+                value={draftTechnicianId}
+              >
+                <option value="">Select technician</option>
+                {technicians.map((technician) => (
+                  <option disabled={!technician.active} key={technician.id} value={technician.id}>
+                    {technician.name} / {technician.cities || "No city"} / {technician.deviceCount} devices
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-bold text-black">
+              Success Date & Time
+              <input
+                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-medium outline-none focus:border-black"
+                onChange={(event) => setInstallCompletedAt(event.target.value)}
+                type="datetime-local"
+                value={installCompletedAt}
+              />
+            </label>
+            <label className="text-xs font-bold text-black">
+              Sale Price
+              <input
+                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-medium outline-none focus:border-black"
+                onChange={(event) => setInstallSalePrice(event.target.value)}
+                step="0.01"
+                type="number"
+                value={installSalePrice}
+              />
+            </label>
+            <label className="text-xs font-bold text-black">
+              Technician Commission
+              <input
+                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-medium outline-none focus:border-black"
+                onChange={(event) => setInstallCommissionAmount(event.target.value)}
+                step="0.01"
+                type="number"
+                value={installCommissionAmount}
+              />
+            </label>
+            <button
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-[6px] bg-black px-3 text-xs font-bold text-white disabled:cursor-wait disabled:bg-[#343434]"
+              disabled={busy}
+              onClick={markInstallSuccess}
+              type="button"
+            >
+              {isInstalling ? <LoadingSpinner className="size-3" /> : null}
+              {isInstalling ? "Recording" : "Record Success"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {error ? <p className="max-w-[240px] text-xs font-semibold text-red-600">{error}</p> : null}
+      {successMessage ? <p className="max-w-[260px] text-xs font-semibold text-green-700">{successMessage}</p> : null}
     </div>
   );
 }

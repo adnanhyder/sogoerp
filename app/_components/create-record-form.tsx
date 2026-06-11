@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CreateConfig } from "@/lib/create-config";
 import { LoadingSpinner } from "./loading-spinner";
@@ -9,11 +9,46 @@ type CreateRecordFormProps = {
   config: CreateConfig;
 };
 
+type TechnicianOption = {
+  active: boolean;
+  cities: string;
+  deviceCount: number;
+  id: string;
+  name: string;
+};
+
 export function CreateRecordForm({ config }: CreateRecordFormProps) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
+  const needsTechnicians = config.fields.some((field) => field.type === "technician-select");
+
+  useEffect(() => {
+    if (!needsTechnicians) {
+      return;
+    }
+
+    let ignore = false;
+
+    async function loadTechnicians() {
+      const response = await fetch("/api/erp/options/technicians", { cache: "no-store" });
+      const payload = (await response.json()) as {
+        technicians?: TechnicianOption[];
+      };
+
+      if (!ignore) {
+        setTechnicians(payload.technicians ?? []);
+      }
+    }
+
+    void loadTechnicians();
+
+    return () => {
+      ignore = true;
+    };
+  }, [needsTechnicians]);
 
   async function handleSubmit(formData: FormData) {
     setError("");
@@ -68,6 +103,20 @@ export function CreateRecordForm({ config }: CreateRecordFormProps) {
               {field.options?.map((option) => (
                 <option key={option} value={option}>
                   {option.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+          ) : field.type === "technician-select" ? (
+            <select
+              className="h-11 w-full rounded-[6px] border border-[#d2d2d2] bg-white px-3 text-sm text-black outline-none focus:border-black"
+              defaultValue=""
+              name={field.name}
+              required={field.required}
+            >
+              <option value="">No technician selected</option>
+              {technicians.map((technician) => (
+                <option disabled={!technician.active} key={technician.id} value={technician.id}>
+                  {technician.name} / {technician.cities || "No city"} / {technician.deviceCount} devices
                 </option>
               ))}
             </select>
