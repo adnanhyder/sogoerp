@@ -241,7 +241,7 @@ export async function getDashboardData(
       countRows(supabase, "support_tickets"),
       sumFinance(supabase, "income", monthStart),
       sumFinance(supabase, "expense", monthStart),
-      sumCommissions(supabase),
+      sumCommissions(supabase, monthStart),
       countRows(supabase, "devices", (query) => query.eq("status", "purchased")),
       countRows(supabase, "devices", (query) => query.eq("status", "imei_approved")),
       countRows(supabase, "devices", (query) => query.eq("custody_status", "received_by_technician")),
@@ -249,7 +249,7 @@ export async function getDashboardData(
         query.in("status", ["installed", "activated_with_sim", "active"]),
       ),
       countRows(supabase, "work_orders", (query) =>
-        query.gte("created_at", todayStart).lt("created_at", tomorrowStart),
+        query.gte("scheduled_at", todayStart).lt("scheduled_at", tomorrowStart),
       ),
       countRows(supabase, "work_orders", (query) =>
         query.eq("status", "completed").gte("completed_at", todayStart).lt("completed_at", tomorrowStart),
@@ -290,6 +290,7 @@ export async function getDashboardData(
     const installSla = totalWorkOrders
       ? Math.round((completedToday / Math.max(assignedToday, 1)) * 100)
       : 0;
+    const slaRisk = Math.max(0, assignedToday - completedToday);
     const netProfit = monthlyIncome - monthlyExpenses - totalCommissions;
 
     return {
@@ -357,7 +358,7 @@ export async function getDashboardData(
               ["Assigned Today", formatCount(assignedToday)],
               ["Completed Today", formatCount(completedToday)],
               ["Awaiting Proof", formatCount(awaitingProof)],
-              ["SLA Risk", "0"],
+              ["SLA Risk", formatCount(slaRisk)],
             ],
           },
           {
@@ -398,8 +399,14 @@ export async function getDashboardData(
   }
 }
 
-async function sumCommissions(supabase: SupabaseClient) {
-  const { data, error } = await supabase.from("commissions").select("amount").eq("paid", false);
+async function sumCommissions(supabase: SupabaseClient, startDate?: string) {
+  let query = supabase.from("commissions").select("amount").eq("paid", false);
+
+  if (startDate) {
+    query = query.gte("created_at", startDate);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
@@ -451,7 +458,7 @@ export async function getModuleData(
               { label: "Matured Leads", value: formatCount(await countRows(supabase, "leads", (query) => query.eq("stage", "matured"))), detail: "Ready to schedule" },
               { label: "Total Leads", value: formatCount(await countRows(supabase, "leads")), detail: "All lead records" },
             ],
-            rows: await tableRows(supabase, "leads", ["name", "source", "stage", "phone", "next_follow_up_at", "created_at"]),
+            rows: await leadRows(supabase),
           },
           error: null,
         };
@@ -469,7 +476,18 @@ export async function getModuleData(
           error: null,
         };
       case "customers":
-        return moduleQuery(supabase, "customers", ["full_name", "phone", "whatsapp", "area", "created_at"]);
+        return {
+          data: {
+            metrics: [
+              { label: "Customers", value: formatCount(await countRows(supabase, "customers")), detail: "All customer records" },
+              { label: "Meetings Due", value: formatCount(await countRows(supabase, "customer_meetings", (query) => query.lte("scheduled_at", new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()).in("status", ["scheduled", "rescheduled"]))), detail: "Due within 24 hours" },
+              { label: "Scheduled", value: formatCount(await countRows(supabase, "customer_meetings", (query) => query.in("status", ["scheduled", "rescheduled"]))), detail: "Open technician meetings" },
+              { label: "Completed", value: formatCount(await countRows(supabase, "customer_meetings", (query) => query.eq("status", "completed"))), detail: "Finished customer meetings" },
+            ],
+            rows: await customerRows(supabase),
+          },
+          error: null,
+        };
       case "simConfig":
         return moduleQuery(supabase, "sims", ["sim_number", "network_provider", "apn_settings", "activation_date", "active"]);
       case "finance":
@@ -620,7 +638,7 @@ async function technicianRows(supabase: SupabaseClient) {
   const technicianIds = rows.map((row) => String(row.id ?? "")).filter(Boolean);
   const [deviceCounts, toInstallCounts, queueCounts, disputedCounts] = await Promise.all([
     deviceCountsByTechnician(supabase, technicianIds),
-    deviceToInstallCountsByTechnician(supabase, technicianIds),
+    workOrderCountsByTechnician(supabase, technicianIds, ["in_progress"]),
     workOrderCountsByTechnician(supabase, technicianIds, ["assigned", "scheduled"]),
     disputedDeviceCountsByTechnician(supabase, technicianIds),
   ]);
@@ -639,16 +657,151 @@ async function technicianRows(supabase: SupabaseClient) {
       String(row.cnic ?? "-"),
       String(row.cities ?? "-"),
       String(row.phone ?? "-"),
-      formatCount(deviceCounts.get(technicianId)),
-      formatCount(toInstallCounts.get(technicianId)),
-      formatCount(queueCounts.get(technicianId)),
-      formatCount(disputedCounts.get(technicianId)),
+      `Devices ${formatCount(deviceCounts.get(technicianId))} / Install ${formatCount(toInstallCounts.get(technicianId))} / Queue ${formatCount(queueCounts.get(technicianId))} / Disputed ${formatCount(disputedCounts.get(technicianId))}`,
       String(row.authorization_person_name ?? "-"),
       String(row.commission_rate ?? "0"),
       technicianStatus(row.active, row.disputed),
       formatDateTime(String(row.created_at ?? "")),
     ];
   });
+}
+
+async function leadRows(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("id,name,phone,whatsapp,source,location,vehicle_type,budget,stage,next_follow_up_at,created_at")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => [
+    String(row.id ?? ""),
+    String(row.stage ?? "new_lead"),
+    String(row.next_follow_up_at ?? ""),
+    String(row.name ?? "-"),
+    String(row.phone ?? "-"),
+    String(row.whatsapp ?? ""),
+    String(row.source ?? ""),
+    String(row.location ?? "-"),
+    String(row.vehicle_type ?? "-"),
+    String(row.budget ?? "0"),
+    String(row.stage ?? "-").replaceAll("_", " "),
+    formatDateTime(String(row.next_follow_up_at ?? "")),
+    formatDateTime(String(row.created_at ?? "")),
+  ]);
+}
+
+function technicianMatchScore(customerLocation: string, technician: Record<string, unknown>) {
+  const locationTokens = customerLocation
+    .toLowerCase()
+    .split(/[,\s/]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const coverageTokens = `${String(technician.cities ?? "")} ${String(technician.area_coverage ?? "")}`
+    .toLowerCase()
+    .split(/[,\s/]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const coverage = new Set(coverageTokens);
+
+  if (!locationTokens.length || !coverageTokens.length) {
+    return 0;
+  }
+
+  return locationTokens.filter((part) => coverage.has(part)).length;
+}
+
+async function customerRows(supabase: SupabaseClient) {
+  const [{ data, error }, { data: technicians, error: technicianError }] = await Promise.all([
+    supabase
+      .from("customers")
+      .select("id,full_name,phone,whatsapp,email,address,area,location,vehicle_type,budget,notes,created_at")
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("technicians")
+      .select("id,name,cities,area_coverage,active")
+      .eq("active", true)
+      .order("name", { ascending: true }),
+  ]);
+
+  if (error) {
+    throw error;
+  }
+
+  if (technicianError) {
+    throw technicianError;
+  }
+
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const customerIds = rows.map((row) => String(row.id ?? "")).filter(Boolean);
+  const meetingsByCustomer = await latestMeetingsByCustomer(supabase, customerIds);
+  const technicianRowsData = (technicians ?? []) as Record<string, unknown>[];
+
+  return rows.map((row) => {
+    const customerId = String(row.id ?? "");
+    const location = String(row.location ?? row.area ?? row.address ?? "");
+    const suggested = technicianRowsData
+      .map((technician) => ({ score: technicianMatchScore(location, technician), technician }))
+      .filter((match) => match.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map((match) => String(match.technician.name ?? "-"))
+      .join(", ");
+    const nextMeeting = meetingsByCustomer.get(customerId);
+
+    return [
+      customerId,
+      String(row.full_name ?? "-"),
+      String(row.phone ?? "-"),
+      String(row.whatsapp ?? ""),
+      String(row.email ?? ""),
+      String(row.address ?? ""),
+      String(row.area ?? ""),
+      String(row.location ?? "-"),
+      String(row.vehicle_type ?? "-"),
+      String(row.budget ?? "0"),
+      String(row.notes ?? ""),
+      suggested || "No area match",
+      nextMeeting ?? "-",
+      formatDateTime(String(row.created_at ?? "")),
+    ];
+  });
+}
+
+async function latestMeetingsByCustomer(supabase: SupabaseClient, customerIds: string[]) {
+  const meetings = new Map<string, string>();
+
+  if (!customerIds.length) {
+    return meetings;
+  }
+
+  const { data, error } = await supabase
+    .from("customer_meetings")
+    .select("customer_id,scheduled_at,status,technicians(name)")
+    .in("customer_id", customerIds)
+    .in("status", ["scheduled", "rescheduled"])
+    .order("scheduled_at", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  for (const row of (data ?? []) as Record<string, unknown>[]) {
+    const customerId = String(row.customer_id ?? "");
+
+    if (!customerId || meetings.has(customerId)) {
+      continue;
+    }
+
+    const technicianName = relatedField(row.technicians, "name") ?? "Technician";
+    meetings.set(customerId, `${formatDateTime(String(row.scheduled_at ?? ""))} / ${technicianName}`);
+  }
+
+  return meetings;
 }
 
 async function deviceCountsByTechnician(supabase: SupabaseClient, technicianIds: string[]) {
@@ -686,44 +839,13 @@ async function disputedDeviceCountsByTechnician(supabase: SupabaseClient, techni
     .from("devices")
     .select("technician_id")
     .in("technician_id", technicianIds)
-    .ilike("status", "%disputed%");
+    .or("status.ilike.%disputed%,status.ilike.%fault%,status.ilike.%faulty%,status.ilike.%issue%,status.ilike.%returned%,status.ilike.%replaced%");
 
   if (error) {
     throw error;
   }
 
   for (const row of data ?? []) {
-    const technicianId = String(row.technician_id);
-    counts.set(technicianId, (counts.get(technicianId) ?? 0) + 1);
-  }
-
-  return counts;
-}
-
-async function deviceToInstallCountsByTechnician(supabase: SupabaseClient, technicianIds: string[]) {
-  const counts = new Map<string, number>();
-
-  if (!technicianIds.length) {
-    return counts;
-  }
-
-  const { data, error } = await supabase
-    .from("devices")
-    .select("technician_id,status")
-    .in("technician_id", technicianIds)
-    .eq("custody_status", "received_by_technician");
-
-  if (error) {
-    throw error;
-  }
-
-  for (const row of data ?? []) {
-    const status = String(row.status ?? "").toLowerCase();
-
-    if (["installed", "activated_with_sim", "active"].includes(status)) {
-      continue;
-    }
-
     const technicianId = String(row.technician_id);
     counts.set(technicianId, (counts.get(technicianId) ?? 0) + 1);
   }

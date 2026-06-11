@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createConfigs, type CreateConfig, type CreateModuleKey } from "@/lib/create-config";
+import { getErpUserContext, requireRole } from "@/lib/erp-context";
 import { createClient } from "@/lib/supabase/server";
 
 export async function DELETE(request: Request) {
@@ -19,9 +20,23 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let context;
+
+  try {
+    context = await getErpUserContext(supabase);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Authentication required." },
+      { status: 401 },
+    );
+  }
+
+  try {
+    requireRole(context, ["admin"]);
+  } catch {
+    return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  }
+
   const { data: record, error: lookupError } = await supabase
     .from(config.table)
     .select("*")
@@ -38,15 +53,13 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  if (user) {
-    await supabase.from("activity_events").insert({
-      created_by: user.id,
-      event_type: "deleted",
-      module_key: moduleKey,
-      record_id: body.id,
-      record_label: String(record.imei ?? record.name ?? "Record"),
-    });
-  }
+  await supabase.from("activity_events").insert({
+    created_by: context.userId,
+    event_type: "deleted",
+    module_key: moduleKey,
+    record_id: body.id,
+    record_label: String(record.imei ?? record.name ?? "Record"),
+  });
 
   return NextResponse.json({ ok: true });
 }

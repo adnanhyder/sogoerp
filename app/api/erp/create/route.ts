@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createConfigs, type CreateConfig, type CreateModuleKey } from "@/lib/create-config";
+import { getErpUserContext, organizationPayload, requireRole } from "@/lib/erp-context";
 import { createClient } from "@/lib/supabase/server";
 
 function recordLabel(values: Record<string, unknown>) {
@@ -60,24 +61,58 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let context;
+
+  try {
+    context = await getErpUserContext(supabase);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Authentication required." },
+      { status: 401 },
+    );
+  }
+
+  Object.assign(payload, organizationPayload(context));
+
+  try {
+    if (["finance", "commissions"].includes(moduleKey)) {
+      requireRole(context, ["admin", "accountant"]);
+    } else if (moduleKey === "leads") {
+      requireRole(context, ["admin", "sales"]);
+    } else {
+      requireRole(context, ["admin"]);
+    }
+  } catch {
+    return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  }
+
+  if (moduleKey === "insurance" && typeof payload.customer_id === "string") {
+    const { data: customer, error: customerError } = await supabase
+      .from("customers")
+      .select("full_name")
+      .eq("id", payload.customer_id)
+      .single();
+
+    if (customerError) {
+      return NextResponse.json({ error: customerError.message }, { status: 400 });
+    }
+
+    payload.customer_name = customer.full_name;
+  }
+
   const { data, error } = await supabase.from(config.table).insert(payload).select("id").single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  if (user) {
-    await supabase.from("activity_events").insert({
-      created_by: user.id,
-      event_type: "created",
-      module_key: moduleKey,
-      record_id: data.id,
-      record_label: recordLabel(payload),
-    });
-  }
+  await supabase.from("activity_events").insert({
+    created_by: context.userId,
+    event_type: "created",
+    module_key: moduleKey,
+    record_id: data.id,
+    record_label: recordLabel(payload),
+  });
 
   return NextResponse.json({ ok: true });
 }

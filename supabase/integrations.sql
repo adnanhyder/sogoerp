@@ -1,5 +1,6 @@
 create table if not exists public.api_sources (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid references public.organizations(id) on delete cascade,
   name text not null,
   source_key text not null unique,
   allowed_events text[] not null default '{}',
@@ -9,6 +10,7 @@ create table if not exists public.api_sources (
 
 create table if not exists public.inbound_events (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid references public.organizations(id) on delete cascade,
   source text not null,
   event_type text not null,
   payload jsonb not null default '{}'::jsonb,
@@ -20,6 +22,7 @@ create table if not exists public.inbound_events (
 
 create table if not exists public.import_jobs (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid references public.organizations(id) on delete cascade,
   import_type text not null,
   file_url text,
   status text not null default 'pending',
@@ -33,6 +36,7 @@ create table if not exists public.import_jobs (
 
 create table if not exists public.export_jobs (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid references public.organizations(id) on delete cascade,
   export_type text not null,
   file_url text,
   status text not null default 'pending',
@@ -41,22 +45,34 @@ create table if not exists public.export_jobs (
   completed_at timestamptz
 );
 
+alter table public.api_sources
+add column if not exists organization_id uuid references public.organizations(id) on delete cascade;
+
+alter table public.inbound_events
+add column if not exists organization_id uuid references public.organizations(id) on delete cascade;
+
+alter table public.import_jobs
+add column if not exists organization_id uuid references public.organizations(id) on delete cascade;
+
+alter table public.export_jobs
+add column if not exists organization_id uuid references public.organizations(id) on delete cascade;
+
 alter table public.api_sources enable row level security;
 alter table public.inbound_events enable row level security;
 alter table public.import_jobs enable row level security;
 alter table public.export_jobs enable row level security;
 
 drop policy if exists "authenticated can use api_sources" on public.api_sources;
-create policy "authenticated can use api_sources" on public.api_sources for all to authenticated using (true) with check (true);
+create policy "authenticated can use api_sources" on public.api_sources for all to authenticated using (public.can_use_organization(organization_id)) with check (public.can_use_organization(organization_id));
 
 drop policy if exists "authenticated can use inbound_events" on public.inbound_events;
-create policy "authenticated can use inbound_events" on public.inbound_events for all to authenticated using (true) with check (true);
+create policy "authenticated can use inbound_events" on public.inbound_events for all to authenticated using (public.can_use_organization(organization_id)) with check (public.can_use_organization(organization_id));
 
 drop policy if exists "authenticated can use import_jobs" on public.import_jobs;
-create policy "authenticated can use import_jobs" on public.import_jobs for all to authenticated using (true) with check (true);
+create policy "authenticated can use import_jobs" on public.import_jobs for all to authenticated using (public.can_use_organization(organization_id)) with check (public.can_use_organization(organization_id));
 
 drop policy if exists "authenticated can use export_jobs" on public.export_jobs;
-create policy "authenticated can use export_jobs" on public.export_jobs for all to authenticated using (true) with check (true);
+create policy "authenticated can use export_jobs" on public.export_jobs for all to authenticated using (public.can_use_organization(organization_id)) with check (public.can_use_organization(organization_id));
 
 create or replace function public.ingest_lead(payload jsonb)
 returns uuid
@@ -68,6 +84,7 @@ declare
   created_id uuid;
 begin
   insert into public.leads (
+    organization_id,
     name,
     phone,
     whatsapp,
@@ -78,6 +95,7 @@ begin
     stage
   )
   values (
+    nullif(payload ->> 'organization_id', '')::uuid,
     coalesce(payload ->> 'name', 'Unknown Lead'),
     payload ->> 'phone',
     payload ->> 'whatsapp',
@@ -89,8 +107,8 @@ begin
   )
   returning id into created_id;
 
-  insert into public.inbound_events (source, event_type, payload, status, processed_at)
-  values (coalesce(payload ->> 'source', 'external'), 'lead.created', payload, 'processed', now());
+  insert into public.inbound_events (organization_id, source, event_type, payload, status, processed_at)
+  values (nullif(payload ->> 'organization_id', '')::uuid, coalesce(payload ->> 'source', 'external'), 'lead.created', payload, 'processed', now());
 
   return created_id;
 end;
@@ -106,6 +124,7 @@ declare
   created_id uuid;
 begin
   insert into public.customers (
+    organization_id,
     full_name,
     phone,
     whatsapp,
@@ -114,6 +133,7 @@ begin
     area
   )
   values (
+    nullif(payload ->> 'organization_id', '')::uuid,
     coalesce(payload ->> 'full_name', payload ->> 'name', 'Unknown Customer'),
     payload ->> 'phone',
     payload ->> 'whatsapp',
@@ -123,8 +143,8 @@ begin
   )
   returning id into created_id;
 
-  insert into public.inbound_events (source, event_type, payload, status, processed_at)
-  values (coalesce(payload ->> 'source', 'external'), 'customer.created', payload, 'processed', now());
+  insert into public.inbound_events (organization_id, source, event_type, payload, status, processed_at)
+  values (nullif(payload ->> 'organization_id', '')::uuid, coalesce(payload ->> 'source', 'external'), 'customer.created', payload, 'processed', now());
 
   return created_id;
 end;
@@ -140,6 +160,7 @@ declare
   created_id uuid;
 begin
   insert into public.devices (
+    organization_id,
     imei,
     purchase_cost,
     sale_price,
@@ -149,6 +170,7 @@ begin
     custody_updated_at
   )
   values (
+    nullif(payload ->> 'organization_id', '')::uuid,
     payload ->> 'imei',
     coalesce(nullif(payload ->> 'purchase_cost', '')::numeric, 0),
     coalesce(nullif(payload ->> 'sale_price', '')::numeric, 0),
@@ -159,8 +181,8 @@ begin
   )
   returning id into created_id;
 
-  insert into public.inbound_events (source, event_type, payload, status, processed_at)
-  values (coalesce(payload ->> 'source', 'external'), 'device.created', payload, 'processed', now());
+  insert into public.inbound_events (organization_id, source, event_type, payload, status, processed_at)
+  values (nullif(payload ->> 'organization_id', '')::uuid, coalesce(payload ->> 'source', 'external'), 'device.created', payload, 'processed', now());
 
   return created_id;
 end;
@@ -176,6 +198,7 @@ declare
   created_id uuid;
 begin
   insert into public.sims (
+    organization_id,
     sim_number,
     network_provider,
     apn_settings,
@@ -183,6 +206,7 @@ begin
     activation_date
   )
   values (
+    nullif(payload ->> 'organization_id', '')::uuid,
     payload ->> 'sim_number',
     payload ->> 'network_provider',
     payload ->> 'apn_settings',
@@ -191,8 +215,8 @@ begin
   )
   returning id into created_id;
 
-  insert into public.inbound_events (source, event_type, payload, status, processed_at)
-  values (coalesce(payload ->> 'source', 'external'), 'sim.created', payload, 'processed', now());
+  insert into public.inbound_events (organization_id, source, event_type, payload, status, processed_at)
+  values (nullif(payload ->> 'organization_id', '')::uuid, coalesce(payload ->> 'source', 'external'), 'sim.created', payload, 'processed', now());
 
   return created_id;
 end;
@@ -208,6 +232,7 @@ declare
   created_id uuid;
 begin
   insert into public.finance_entries (
+    organization_id,
     entry_type,
     category,
     amount,
@@ -215,6 +240,7 @@ begin
     occurred_on
   )
   values (
+    nullif(payload ->> 'organization_id', '')::uuid,
     coalesce((payload ->> 'entry_type')::public.finance_entry_type, 'income'),
     coalesce(payload ->> 'category', 'General'),
     coalesce(nullif(payload ->> 'amount', '')::numeric, 0),
@@ -223,8 +249,8 @@ begin
   )
   returning id into created_id;
 
-  insert into public.inbound_events (source, event_type, payload, status, processed_at)
-  values (coalesce(payload ->> 'source', 'external'), 'finance.created', payload, 'processed', now());
+  insert into public.inbound_events (organization_id, source, event_type, payload, status, processed_at)
+  values (nullif(payload ->> 'organization_id', '')::uuid, coalesce(payload ->> 'source', 'external'), 'finance.created', payload, 'processed', now());
 
   return created_id;
 end;
@@ -240,19 +266,21 @@ declare
   created_id uuid;
 begin
   insert into public.communication_logs (
+    organization_id,
     channel,
     direction,
     message
   )
   values (
+    nullif(payload ->> 'organization_id', '')::uuid,
     'whatsapp',
     coalesce(payload ->> 'direction', 'inbound'),
     coalesce(payload ->> 'message', '')
   )
   returning id into created_id;
 
-  insert into public.inbound_events (source, event_type, payload, status, processed_at)
-  values (coalesce(payload ->> 'source', 'whatsapp'), 'whatsapp.message', payload, 'processed', now());
+  insert into public.inbound_events (organization_id, source, event_type, payload, status, processed_at)
+  values (nullif(payload ->> 'organization_id', '')::uuid, coalesce(payload ->> 'source', 'whatsapp'), 'whatsapp.message', payload, 'processed', now());
 
   return created_id;
 end;

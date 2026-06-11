@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getErpUserContext, organizationPayload, requireRole } from "@/lib/erp-context";
 import { createClient } from "@/lib/supabase/server";
 
 function numberOrZero(value: unknown) {
@@ -34,19 +35,28 @@ export async function POST(request: Request) {
 
   const completedAt = completedTimestamp(body.completedAt);
   const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  let context;
 
-  if (userError || !user) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  try {
+    context = await getErpUserContext(supabase);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Authentication required." },
+      { status: 401 },
+    );
+  }
+
+  try {
+    requireRole(context, ["admin"]);
+  } catch {
+    return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   }
 
   const { data: device, error: deviceError } = await supabase
     .from("devices")
-    .select("id,imei")
+    .select("id,imei,customer_id,vehicle_id")
     .eq("id", body.deviceId)
+    .eq("organization_id", context.organizationId)
     .single();
 
   if (deviceError || !device) {
@@ -60,6 +70,7 @@ export async function POST(request: Request) {
     .from("technicians")
     .select("id,name,commission_rate")
     .eq("id", body.technicianId)
+    .eq("organization_id", context.organizationId)
     .single();
 
   if (technicianError || !technician) {
@@ -75,10 +86,13 @@ export async function POST(request: Request) {
       activation_confirmed: true,
       completed_at: completedAt,
       created_at: completedAt,
+      customer_id: device.customer_id,
       device_id: body.deviceId,
+      ...organizationPayload(context),
       scheduled_at: completedAt,
       status: "completed",
       technician_id: body.technicianId,
+      vehicle_id: device.vehicle_id,
     })
     .select("id")
     .single();
@@ -96,7 +110,7 @@ export async function POST(request: Request) {
   const { error: deviceUpdateError } = await supabase
     .from("devices")
     .update({
-      custody_status: "received_by_technician",
+      custody_status: "customer_hands",
       installation_date: completedAt.slice(0, 10),
       sale_price: salePrice,
       status: "installed",
@@ -112,6 +126,7 @@ export async function POST(request: Request) {
     const { error: commissionError } = await supabase.from("commissions").insert({
       amount: commissionAmount,
       created_at: completedAt,
+      ...organizationPayload(context),
       paid: false,
       reason: `Installation commission for ${device.imei ?? "device"}`,
       technician_id: body.technicianId,
@@ -123,8 +138,25 @@ export async function POST(request: Request) {
     }
   }
 
+  if (salePrice > 0) {
+    const { error: financeError } = await supabase.from("finance_entries").insert({
+      amount: salePrice,
+      category: "Device Installation",
+      created_at: completedAt,
+      entry_type: "income",
+      occurred_on: completedAt.slice(0, 10),
+      ...organizationPayload(context),
+      related_customer_id: device.customer_id,
+      related_work_order_id: workOrder.id,
+    });
+
+    if (financeError) {
+      return NextResponse.json({ error: financeError.message }, { status: 400 });
+    }
+  }
+
   await supabase.from("activity_events").insert({
-    created_by: user.id,
+    created_by: context.userId,
     event_type: "created",
     module_key: "inventory",
     record_id: body.deviceId,
