@@ -42,6 +42,16 @@ export async function PATCH(request: Request) {
     payload[field.name] = value;
   }
 
+  if (moduleKey === "technicians") {
+    if (typeof values.active === "boolean") {
+      payload.active = values.active;
+    }
+
+    if (typeof values.disputed === "boolean") {
+      payload.disputed = values.disputed;
+    }
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

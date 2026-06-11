@@ -4,6 +4,7 @@ import { AdminRecordsPanel } from "./admin-records-panel";
 import { ErpShell } from "./erp-shell";
 import { CreateRecordForm } from "./create-record-form";
 import { InventoryRecordActions } from "./inventory-record-actions";
+import { TechnicianRecordActions } from "./technician-record-actions";
 import type { CreateConfig } from "@/lib/create-config";
 
 type ModuleMetric = {
@@ -68,6 +69,7 @@ export function ModulePage({
   workflows,
 }: ModulePageProps) {
   const isInventory = activeHref === "/inventory";
+  const isTechnicians = activeHref === "/technicians";
   const isCoreAdmin = ["/inventory", "/leads", "/technicians", "/customers"].includes(activeHref);
   function renderInventoryCell(cell: string, index: number) {
     if (index === 0) {
@@ -147,13 +149,18 @@ export function ModulePage({
         <tbody>
           {tableRows.length ? (
             tableRows.map((row) => {
-              const visibleCells = isInventory ? row.slice(3) : row;
+              const visibleCells = isInventory ? row.slice(3) : isTechnicians ? row.slice(5) : row;
               const inventoryId = row[0] ?? "";
               const inventoryStatus = row[1] ?? "";
               const inventoryCustodyStatus = row[2] ?? "company_hands";
               const inventoryImei = row[3] ?? "";
               const inventoryHasMic = row[6] ?? "No";
               const inventoryPurchaseCost = row[7] ?? "0";
+              const technicianId = row[0] ?? "";
+              const technicianActive = row[1] === "true";
+              const technicianDisputed = row[2] === "true";
+              const technicianAuthCnic = row[3] ?? "";
+              const technicianAuthRelation = row[4] ?? "";
 
               return (
                 <tr
@@ -183,6 +190,24 @@ export function ModulePage({
                         imei={inventoryImei}
                         purchaseCost={inventoryPurchaseCost}
                         status={inventoryStatus}
+                      />
+                    </td>
+                  ) : null}
+                  {isTechnicians ? (
+                    <td className="px-4 py-4 align-middle">
+                      <TechnicianRecordActions
+                        active={technicianActive}
+                        authorizationPersonCnic={technicianAuthCnic}
+                        authorizationPersonName={row[9] ?? ""}
+                        authorizationPersonPhone={row[10] ?? ""}
+                        authorizationRelation={technicianAuthRelation}
+                        cities={row[7] ?? ""}
+                        cnic={row[6] ?? ""}
+                        commissionRate={row[11] ?? "0"}
+                        disputed={technicianDisputed}
+                        id={technicianId}
+                        name={row[5] ?? ""}
+                        phone={row[8] ?? ""}
                       />
                     </td>
                   ) : null}

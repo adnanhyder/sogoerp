@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Gauge } from "lucide-react";
 import { AuthBackground } from "../_components/auth-background";
+import { BrandLogo } from "../_components/brand-logo";
 import { ForgotPasswordForm } from "../_components/forgot-password-form";
 import { IphoneFrame } from "../_components/iphone-frame";
 
@@ -9,14 +9,7 @@ export default function ForgotPasswordPage() {
     <AuthBackground>
       <section className="auth-content grid w-full max-w-[1180px] items-center gap-8 lg:grid-cols-[0.92fr_1.08fr]">
         <div className="hidden min-h-[680px] border-r border-black/15 p-3 pr-10 lg:flex lg:flex-col lg:justify-between">
-          <Link className="flex items-center gap-3" href="/login">
-            <div className="grid size-8 place-items-center rounded-[6px] bg-black text-white">
-              <Gauge className="size-5" strokeWidth={2.4} />
-            </div>
-            <span className="text-[17px] font-bold tracking-[-0.01em] text-black">
-              SOGOERP
-            </span>
-          </Link>
+          <BrandLogo href="/login" />
 
           <div className="auth-copy-text">
             <p className="text-sm font-medium text-[#777777]">Account Recovery</p>
@@ -40,14 +33,7 @@ export default function ForgotPasswordPage() {
         <div className="w-full lg:pl-10">
           <IphoneFrame>
             <div className="auth-form-panel">
-              <Link className="mb-8 flex items-center gap-3" href="/login">
-                <div className="grid size-8 place-items-center rounded-[6px] bg-black text-white">
-                  <Gauge className="size-5" strokeWidth={2.4} />
-                </div>
-                <span className="text-[17px] font-bold tracking-[-0.01em] text-black">
-                  SOGOERP
-                </span>
-              </Link>
+              <BrandLogo className="mb-8" href="/login" />
 
               <div className="max-w-md">
                 <p className="text-sm font-medium text-[#777777]">Forgot password</p>

@@ -140,6 +140,7 @@ export const createConfigs = {
     table: "technicians",
     fields: [
       { label: "Name", name: "name", required: true, type: "text" },
+      { label: "Technician CNIC", name: "cnic", type: "text" },
       { label: "Phone", name: "phone", type: "text" },
       { label: "Area Coverage", name: "area_coverage", type: "text" },
       { label: "Cities", name: "cities", type: "text" },

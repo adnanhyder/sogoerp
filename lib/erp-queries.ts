@@ -458,7 +458,18 @@ export async function getModuleData(
           error: null,
         };
       case "technicians":
-        return moduleQuery(supabase, "technicians", ["name", "cities", "phone", "authorization_person_name", "authorization_person_phone", "commission_rate", "created_at"]);
+        return {
+          data: {
+            metrics: [
+              { label: "Technicians", value: formatCount(await countRows(supabase, "technicians")), detail: "All technician records" },
+              { label: "Active", value: formatCount(await countRows(supabase, "technicians", (query) => query.eq("active", true))), detail: "Allowed to receive work" },
+              { label: "Blocked", value: formatCount(await countRows(supabase, "technicians", (query) => query.eq("active", false))), detail: "Access blocked" },
+              { label: "Disputed", value: formatCount(await countRows(supabase, "technicians", (query) => query.eq("disputed", true))), detail: "Marked for review" },
+            ],
+            rows: await technicianRows(supabase),
+          },
+          error: null,
+        };
       case "customers":
         return moduleQuery(supabase, "customers", ["full_name", "phone", "whatsapp", "area", "created_at"]);
       case "simConfig":
@@ -568,6 +579,43 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
       String(row.purchase_cost ?? "0"),
       formatDateTime(String(row.created_at ?? "")),
     ]);
+}
+
+function technicianStatus(active: unknown, disputed: unknown) {
+  if (disputed) {
+    return "Disputed";
+  }
+
+  return active ? "Active" : "Blocked";
+}
+
+async function technicianRows(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("technicians")
+    .select("id,name,cnic,cities,phone,authorization_person_name,authorization_person_phone,authorization_person_cnic,authorization_relation,commission_rate,active,disputed,created_at")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => [
+    String(row.id ?? ""),
+    row.active ? "true" : "false",
+    row.disputed ? "true" : "false",
+    String(row.authorization_person_cnic ?? ""),
+    String(row.authorization_relation ?? ""),
+    String(row.name ?? "-"),
+    String(row.cnic ?? "-"),
+    String(row.cities ?? "-"),
+    String(row.phone ?? "-"),
+    String(row.authorization_person_name ?? "-"),
+    String(row.authorization_person_phone ?? "-"),
+    String(row.commission_rate ?? "0"),
+    technicianStatus(row.active, row.disputed),
+    formatDateTime(String(row.created_at ?? "")),
+  ]);
 }
 
 async function moduleQuery(supabase: SupabaseClient, table: string, columns: string[]) {

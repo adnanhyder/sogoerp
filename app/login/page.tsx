@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Gauge } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AuthBackground } from "../_components/auth-background";
+import { BrandLogo } from "../_components/brand-logo";
 import { IphoneFrame } from "../_components/iphone-frame";
 import { LoginForm } from "../_components/login-form";
 import { createClient } from "@/lib/supabase/server";
@@ -44,14 +44,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               </clipPath>
             </defs>
           </svg>
-          <Link className="flex items-center gap-3 mt-[30px] ml-[25px]" href="/login">
-            <div className="grid size-8 place-items-center rounded-[6px] bg-black text-white">
-              <Gauge className="size-5" strokeWidth={2.4} />
-            </div>
-            <span className="text-[17px] font-bold tracking-[-0.01em] text-black">
-              SOGOERP
-            </span>
-          </Link>
+          <BrandLogo className="mt-[30px] ml-[25px]" href="/login" />
 
           <div className="auth-info-box auth-copy-text">
             <p className="text-sm font-medium text-[#777777]">GPS Tracking ERP</p>
@@ -74,14 +67,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <div className="w-full lg:pl-10 lg:border-l-[20px] border-[#000000]">
           <IphoneFrame>
             <div className="auth-form-panel">
-              <Link className="mb-8 flex items-center gap-3" href="/login">
-                <div className="grid size-8 place-items-center rounded-[6px] bg-black text-white">
-                  <Gauge className="size-5" strokeWidth={2.4} />
-                </div>
-                <span className="text-[17px] font-bold tracking-[-0.01em] text-black">
-                  SOGOERP
-                </span>
-              </Link>
+              <BrandLogo className="mb-8" href="/login" />
 
               <div className="max-w-md">
                 <p className="text-sm font-medium text-[#777777]">Welcome back</p>

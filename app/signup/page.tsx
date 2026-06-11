@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Gauge } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AuthBackground } from "../_components/auth-background";
+import { BrandLogo } from "../_components/brand-logo";
 import { IphoneFrame } from "../_components/iphone-frame";
 import { SignupForm } from "../_components/signup-form";
 import { createClient } from "@/lib/supabase/server";
@@ -22,14 +22,7 @@ export default async function SignupPage() {
         <div className="order-2 w-full lg:order-1 lg:border-r-[20px] lg:border-[#000000] lg:pr-10">
           <IphoneFrame>
             <div className="auth-form-panel">
-              <Link className="mb-8 flex items-center gap-3" href="/login">
-                <div className="grid size-8 place-items-center rounded-[6px] bg-black text-white">
-                  <Gauge className="size-5" strokeWidth={2.4} />
-                </div>
-                <span className="text-[17px] font-bold tracking-[-0.01em] text-black">
-                  SOGOERP
-                </span>
-              </Link>
+              <BrandLogo className="mb-8" href="/login" />
 
               <div className="max-w-md">
                 <p className="text-sm font-medium text-[#777777]">Start your workspace</p>
@@ -51,14 +44,7 @@ export default async function SignupPage() {
         </div>
 
         <div className="order-1 hidden min-h-[680px] p-3 lg:flex lg:flex-col lg:justify-between lg:pl-10">
-          <Link className="flex items-center gap-3" href="/login">
-            <div className="grid size-8 place-items-center rounded-[6px] bg-black text-white">
-              <Gauge className="size-5" strokeWidth={2.4} />
-            </div>
-            <span className="text-[17px] font-bold tracking-[-0.01em] text-black">
-              SOGOERP
-            </span>
-          </Link>
+          <BrandLogo href="/login" />
 
           <div className="auth-info-box p-6">
             <p className="text-sm font-medium text-[#777777]">Workspace setup</p>

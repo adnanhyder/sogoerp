@@ -10,8 +10,8 @@ export async function DELETE(request: Request) {
   const moduleKey = body.moduleKey as CreateModuleKey;
   const config = createConfigs[moduleKey] as CreateConfig | undefined;
 
-  if (!config || moduleKey !== "inventory") {
-    return NextResponse.json({ error: "Only inventory records can be deleted here." }, { status: 400 });
+  if (!config || !["inventory", "technicians"].includes(moduleKey)) {
+    return NextResponse.json({ error: "This ERP module cannot be deleted here." }, { status: 400 });
   }
 
   if (!body.id) {
@@ -24,7 +24,7 @@ export async function DELETE(request: Request) {
   } = await supabase.auth.getUser();
   const { data: record, error: lookupError } = await supabase
     .from(config.table)
-    .select("status,imei")
+    .select("*")
     .eq("id", body.id)
     .single();
 
@@ -44,7 +44,7 @@ export async function DELETE(request: Request) {
       event_type: "deleted",
       module_key: moduleKey,
       record_id: body.id,
-      record_label: record.imei,
+      record_label: String(record.imei ?? record.name ?? "Record"),
     });
   }
 

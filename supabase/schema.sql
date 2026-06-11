@@ -100,6 +100,7 @@ create table public.technicians (
   skills text[],
   commission_rate numeric(12,2) not null default 0,
   fuel_allowance_rule text,
+  disputed boolean not null default false,
   active boolean not null default true,
   created_at timestamptz not null default now()
 );

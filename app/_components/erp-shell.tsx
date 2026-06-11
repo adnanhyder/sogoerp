@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Gauge } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { erpModules } from "@/lib/erp-data";
+import { BrandLogo } from "./brand-logo";
 import { ContentRouteLoader } from "./content-route-loader";
 import { HeaderActions } from "./header-actions";
 
@@ -29,16 +29,7 @@ const hiddenAsideHrefs = new Set([
 ]);
 
 function Logo() {
-  return (
-    <Link className="flex items-center gap-3" href="/dashboard">
-      <div className="grid size-8 place-items-center rounded-[6px] bg-black text-white">
-        <Gauge className="size-5" strokeWidth={2.4} />
-      </div>
-      <span className="text-[17px] font-bold tracking-[-0.01em] text-black">
-        SOGOERP
-      </span>
-    </Link>
-  );
+  return <BrandLogo />;
 }
 
 export function ErpShell({
