@@ -64,7 +64,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
         </div>
 
-        <div className="w-full lg:pl-10 lg:border-l-[20px] border-[#000000]">
+        <div className="w-full lg:pl-0 lg:border-l-[10px] border-[#000000]">
           <IphoneFrame>
             <div className="auth-form-panel">
               <BrandLogo className="mb-8" href="/login" />
