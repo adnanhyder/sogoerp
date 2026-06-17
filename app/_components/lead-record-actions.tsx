@@ -1,8 +1,8 @@
 "use client";
 
 import { CalendarClock, Pencil, Trophy, X, Trash } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { LoadingSpinner } from "./loading-spinner";
 import { DateTimePicker } from "./date-time-picker";
 import { AlertModal } from "./alert-modal";
@@ -59,6 +59,9 @@ export function LeadRecordActions({
   whatsapp,
 }: LeadRecordActionsProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const openFollowUpsId = searchParams.get("openFollowUps");
+
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -76,7 +79,96 @@ export function LeadRecordActions({
   const [draftFollowUpAt, setDraftFollowUpAt] = useState(toDateTimeInput(followUpAt));
   const [conversationNotes, setConversationNotes] = useState("");
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
-  const busy = isSaving || isWinning || isDeleting;
+
+  // Follow-up States
+  const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
+  const [followUps, setFollowUps] = useState<any[]>([]);
+  const [followUpsLoading, setFollowUpsLoading] = useState(false);
+  const [followUpReason, setFollowUpReason] = useState("");
+  const [followUpNotes, setFollowUpNotes] = useState("");
+  const [followUpNextAt, setFollowUpNextAt] = useState("");
+  const [isSavingFollowUp, setIsSavingFollowUp] = useState(false);
+  const [selectedFollowUp, setSelectedFollowUp] = useState<any | null>(null);
+
+  const busy = isSaving || isWinning || isDeleting || isSavingFollowUp;
+
+  // Auto-open modal if specified in search parameters
+  useEffect(() => {
+    if (openFollowUpsId === id) {
+      setIsFollowUpOpen(true);
+    }
+  }, [openFollowUpsId, id]);
+
+  async function fetchFollowUps() {
+    setFollowUpsLoading(true);
+    try {
+      const res = await fetch(`/api/erp/leads/follow-up?leadId=${id}`);
+      if (res.ok) {
+        const payload = await res.json();
+        setFollowUps(payload.followUps ?? []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch follow-ups", err);
+    } finally {
+      setFollowUpsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (isFollowUpOpen) {
+      fetchFollowUps();
+      // Mark all follow-ups for this lead as read
+      fetch("/api/erp/notifications/mark-lead-seen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId: id }),
+      }).catch((err) => console.error("Error marking lead follow-ups as seen:", err));
+    }
+  }, [isFollowUpOpen, id]);
+
+  async function handleAddFollowUp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!followUpReason.trim()) {
+      setError("Please specify the client's reason for not meeting.");
+      return;
+    }
+    if (!followUpNextAt) {
+      setError("Please specify the next follow-up date and time.");
+      return;
+    }
+
+    setError("");
+    setIsSavingFollowUp(true);
+
+    try {
+      const res = await fetch("/api/erp/leads/follow-up", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: id,
+          reason: followUpReason,
+          notes: followUpNotes,
+          nextFollowUpAt: followUpNextAt ? new Date(followUpNextAt).toISOString() : "",
+        }),
+      });
+
+      if (!res.ok) {
+        const payload = await res.json();
+        setError(payload.error ?? "Failed to add follow-up.");
+        return;
+      }
+
+      setFollowUpReason("");
+      setFollowUpNotes("");
+      setFollowUpNextAt("");
+      await fetchFollowUps();
+      router.refresh();
+    } catch (err) {
+      setError("An unexpected error occurred.");
+    } finally {
+      setIsSavingFollowUp(false);
+    }
+  }
 
   async function saveLead() {
     setError("");
@@ -199,7 +291,7 @@ export function LeadRecordActions({
           disabled={busy}
           onClick={() => {
             setError("");
-            setIsEditing(true);
+            setIsFollowUpOpen(true);
           }}
           type="button"
         >
@@ -355,6 +447,185 @@ export function LeadRecordActions({
               >
                 {isSaving ? <LoadingSpinner className="size-4" /> : null}
                 {isSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isFollowUpOpen ? (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="w-full max-w-[650px] rounded-[24px] bg-white p-8 shadow-2xl animate-[slideUpFade_0.3s_ease-out_both] max-h-[90vh] overflow-y-auto">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Follow-up Log</h3>
+                <p className="text-sm text-gray-500 font-medium">Manage notes and schedule next follow-ups for {name}</p>
+              </div>
+              <button
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                onClick={() => setIsFollowUpOpen(false)}
+                type="button"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Form Section */}
+            <form onSubmit={handleAddFollowUp} className="space-y-4">
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Client's Reason for Not Meeting</span>
+                <textarea
+                  className="h-20 w-full rounded-[12px] border-2 border-gray-200 p-3 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  onChange={(e) => setFollowUpReason(e.target.value)}
+                  placeholder="Why did the technician meeting fail? (e.g., client out of city, cancelled, not reachable...)"
+                  value={followUpReason}
+                  required
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Additional Admin Notes</span>
+                <textarea
+                  className="h-20 w-full rounded-[12px] border-2 border-gray-200 p-3 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  onChange={(e) => setFollowUpNotes(e.target.value)}
+                  placeholder="Enter additional meeting details or technician feedback..."
+                  value={followUpNotes}
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Next Follow-up Date & Time</span>
+                <DateTimePicker
+                  className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  onChange={setFollowUpNextAt}
+                  value={followUpNextAt}
+                />
+              </label>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-[12px] bg-[#FAC54D] px-8 text-sm font-bold text-gray-900 shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#e0b040] hover:shadow-lg focus:ring-4 focus:ring-[#FAC54D]/30 disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0"
+                >
+                  {isSavingFollowUp ? <LoadingSpinner className="size-4" /> : null}
+                  {isSavingFollowUp ? "Logging..." : "Log Follow-up"}
+                </button>
+              </div>
+            </form>
+
+            <div className="my-6 h-px bg-gray-100" />
+
+            {/* History Section */}
+            <div>
+              <h4 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider mb-4">
+                Follow-up History ({followUps.length})
+              </h4>
+              
+              {followUpsLoading ? (
+                <div className="flex justify-center py-6">
+                  <LoadingSpinner className="size-6 text-[#FAC54D]" />
+                </div>
+              ) : followUps.length === 0 ? (
+                <div className="rounded-[16px] border border-dashed border-gray-200 p-6 text-center text-sm font-semibold text-gray-400">
+                  No previous follow-up notes recorded.
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+                  {followUps.map((item) => (
+                    <div 
+                      key={item.id} 
+                      onClick={() => setSelectedFollowUp(item)}
+                      title="Click to view details in a popup"
+                      className="relative rounded-[16px] border border-gray-100 bg-gray-50/50 p-4 transition-all hover:bg-white hover:border-[#FAC54D]/50 hover:shadow-sm cursor-pointer group"
+                    >
+                      {!item.seen ? (
+                        <span className="absolute right-4 top-4 rounded-full bg-[#FAC54D]/20 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-gray-800">
+                          New / Due
+                        </span>
+                      ) : null}
+                      <div className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider mb-2">
+                        Logged on {new Date(item.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                      <div className="mb-2">
+                        <span className="text-[10px] font-extrabold text-gray-400 uppercase block tracking-wider mb-0.5">Reason for Not Meeting</span>
+                        <p className="text-sm font-bold text-gray-900 group-hover:text-[#b58b29] transition-colors">{item.reason}</p>
+                      </div>
+                      {item.notes ? (
+                        <div className="mb-2">
+                          <span className="text-[10px] font-extrabold text-gray-400 uppercase block tracking-wider mb-0.5">Admin Notes</span>
+                          <p className="text-xs font-semibold text-gray-700 line-clamp-1">{item.notes}</p>
+                        </div>
+                      ) : null}
+                      <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
+                        <span className="text-[#b58b29] font-bold">Next Scheduled Follow-up:</span>
+                        <span className="text-gray-900 font-bold">
+                          {new Date(item.next_follow_up_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-right font-semibold text-gray-400 group-hover:text-gray-900 mt-2 transition-colors">
+                        Click to view details →
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedFollowUp ? (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="w-full max-w-[500px] rounded-[24px] bg-white p-8 shadow-2xl animate-[slideUpFade_0.3s_ease-out_both]">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Follow-up Details</h3>
+                <p className="text-xs text-gray-400 font-extrabold uppercase tracking-wider mt-1">
+                  Logged on {new Date(selectedFollowUp.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </p>
+              </div>
+              <button
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                onClick={() => setSelectedFollowUp(null)}
+                type="button"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <span className="mb-1.5 block text-[11px] font-extrabold text-[#b58b29] uppercase tracking-wider">Client's Reason for Not Meeting</span>
+                <div className="rounded-[12px] bg-gray-50 border border-gray-100 p-4">
+                  <p className="text-sm font-bold text-gray-900 leading-relaxed whitespace-pre-wrap">{selectedFollowUp.reason}</p>
+                </div>
+              </div>
+
+              {selectedFollowUp.notes ? (
+                <div>
+                  <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Additional Admin Notes</span>
+                  <div className="rounded-[12px] bg-gray-50 border border-gray-100 p-4 max-h-[180px] overflow-y-auto">
+                    <p className="text-xs font-semibold text-gray-700 whitespace-pre-wrap leading-relaxed">{selectedFollowUp.notes}</p>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="rounded-[12px] border-2 border-[#FAC54D]/30 bg-[#FAC54D]/5 p-4 flex items-center justify-between">
+                <span className="text-xs font-bold text-[#b58b29]">Next Scheduled Follow-up:</span>
+                <span className="text-xs font-extrabold text-gray-900">
+                  {new Date(selectedFollowUp.next_follow_up_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-8 flex justify-end">
+              <button
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-[12px] bg-[#FAC54D] px-8 text-sm font-bold text-gray-900 shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#e0b040] hover:shadow-lg focus:ring-4 focus:ring-[#FAC54D]/30 active:translate-y-0"
+                onClick={() => setSelectedFollowUp(null)}
+                type="button"
+              >
+                Close
               </button>
             </div>
           </div>

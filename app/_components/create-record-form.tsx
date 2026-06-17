@@ -118,6 +118,9 @@ export function CreateRecordForm({ config }: CreateRecordFormProps) {
     for (const field of config.fields) {
       if (field.type === "checkbox") {
         values[field.name] = formData.get(field.name) === "on";
+      } else if (field.type === "datetime-local") {
+        const rawVal = formData.get(field.name)?.toString() ?? "";
+        values[field.name] = rawVal ? new Date(rawVal).toISOString() : "";
       } else {
         values[field.name] = formData.get(field.name)?.toString() ?? "";
       }
@@ -152,7 +155,7 @@ export function CreateRecordForm({ config }: CreateRecordFormProps) {
   }
 
   return (
-    <div className="mt-8 overflow-hidden rounded-[24px] border border-gray-100/50 bg-white/70 bg-gradient-to-b from-white/60 to-gray-50/30 p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] backdrop-blur-xl">
+    <div className="mt-8 rounded-[24px] border border-gray-100/50 bg-white/70 bg-gradient-to-b from-white/60 to-gray-50/30 p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] backdrop-blur-xl">
       <div className="mb-8">
         <h3 className="text-xl font-bold tracking-tight text-gray-900">Create New Record</h3>
         <p className="mt-1 text-sm text-gray-500">Fill in the details below to add a new entry to the system.</p>

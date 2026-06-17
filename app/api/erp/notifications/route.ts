@@ -10,7 +10,9 @@ type ActivityEvent = {
 };
 
 type NotificationEvent = Omit<ActivityEvent, "event_type"> & {
-  event_type: ActivityEvent["event_type"] | "hard";
+  event_type: ActivityEvent["event_type"] | "hard" | "followup";
+  lead_name?: string;
+  lead_id?: string;
 };
 
 const moduleHrefs: Record<string, string> = {
@@ -44,6 +46,7 @@ export async function GET() {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }
 
+  // Fetch standard activity events
   const { data, error } = await supabase
     .from("activity_events")
     .select("id,event_type,module_key,record_label,created_at")
@@ -55,6 +58,8 @@ export async function GET() {
   }
 
   let events: NotificationEvent[] = (data ?? []) as ActivityEvent[];
+
+  // Fetch upcoming meetings
   const soon = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const { data: meetings, error: meetingsError } = await supabase
     .from("customer_meetings")
@@ -75,6 +80,34 @@ export async function GET() {
     module_key: "customers",
     record_label: `Meeting due: ${relatedField(meeting.customers, "full_name") ?? "Customer"} with ${relatedField(meeting.technicians, "name") ?? "technician"}`,
   }));
+
+  // Fetch due unseen follow-ups (within 24 hours)
+  const oneDayAhead = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const { data: followUps, error: followUpsError } = await supabase
+    .from("lead_follow_ups")
+    .select("id,reason,next_follow_up_at,lead_id,leads(name)")
+    .lte("next_follow_up_at", oneDayAhead)
+    .eq("seen", false)
+    .order("next_follow_up_at", { ascending: true })
+    .limit(8);
+
+  if (followUpsError) {
+    return NextResponse.json({ error: followUpsError.message }, { status: 400 });
+  }
+
+  const followUpEvents: NotificationEvent[] = ((followUps ?? []) as Record<string, unknown>[]).map((fu) => {
+    const leadObj = (fu.leads || {}) as Record<string, unknown>;
+    const leadName = String(leadObj.name ?? "Lead");
+    return {
+      created_at: String(fu.next_follow_up_at ?? ""),
+      event_type: "followup" as const,
+      id: String(fu.id ?? ""),
+      module_key: "leads",
+      record_label: `Follow-up due: ${leadName} - ${fu.reason}`,
+      lead_id: String(fu.lead_id ?? ""),
+      lead_name: leadName,
+    };
+  });
 
   if (!events.length) {
     const [devices, leads, customers, tickets] = await Promise.all([
@@ -124,13 +157,16 @@ export async function GET() {
       .slice(0, 12);
   }
 
-  events = [...meetingEvents, ...events]
+  // Merge and sort
+  events = [...followUpEvents, ...meetingEvents, ...events]
     .sort((a, b) => {
-      if (a.event_type === "hard" && b.event_type !== "hard") {
+      const isUrgentA = a.event_type === "hard" || a.event_type === "followup";
+      const isUrgentB = b.event_type === "hard" || b.event_type === "followup";
+
+      if (isUrgentA && !isUrgentB) {
         return -1;
       }
-
-      if (b.event_type === "hard" && a.event_type !== "hard") {
+      if (isUrgentB && !isUrgentA) {
         return 1;
       }
 
@@ -138,14 +174,36 @@ export async function GET() {
     })
     .slice(0, 12);
 
+  const { count: unseenCount } = await supabase
+    .from("lead_follow_ups")
+    .select("id", { count: "exact", head: true })
+    .lte("next_follow_up_at", oneDayAhead)
+    .eq("seen", false);
+
   return NextResponse.json({
-    notifications: events.map((event) => ({
-      href: moduleHrefs[event.module_key] ?? "/dashboard",
-      id: event.id,
-      message: `${moduleLabel(event.module_key)} ${event.event_type}: ${event.record_label}`,
-      time: formatTime(event.created_at),
-      tone: event.event_type,
-    })),
+    notifications: events.map((event) => {
+      let message = `${moduleLabel(event.module_key)} ${event.event_type}: ${event.record_label}`;
+      let href = moduleHrefs[event.module_key] ?? "/dashboard";
+
+      if (event.event_type === "followup") {
+        message = event.record_label;
+        const leadName = event.lead_name ?? "";
+        const leadId = event.lead_id ?? "";
+        href = `/leads?q=${encodeURIComponent(leadName)}&openFollowUps=${leadId}`;
+      } else if (event.event_type === "hard") {
+        message = event.record_label;
+      }
+
+      return {
+        href,
+        id: event.id,
+        message,
+        time: formatTime(event.created_at),
+        rawTime: event.created_at,
+        tone: event.event_type,
+      };
+    }),
+    unseenCount: unseenCount ?? 0,
   });
 }
 

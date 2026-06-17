@@ -96,7 +96,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
         conversationNotes,
         customerId,
         outcome,
-        scheduledAt,
+        scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : "",
         status,
         technicianId,
       }),
@@ -133,7 +133,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
     const response = await fetch("/api/erp/install-success", {
       body: JSON.stringify({
         commissionAmount: installCommissionAmount,
-        completedAt: installCompletedAt,
+        completedAt: installCompletedAt ? new Date(installCompletedAt).toISOString() : "",
         customerId,
         deviceId: installDeviceId,
         salePrice: installSalePrice,
