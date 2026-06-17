@@ -44,7 +44,7 @@ export const restModules = {
     table: "devices",
   },
   leads: {
-    fields: ["name", "phone", "whatsapp", "source", "location", "vehicle_type", "budget", "stage", "next_follow_up_at", "created_at"],
+    fields: ["name", "phone", "whatsapp", "source", "location", "vehicle_type", "budget", "stage", "next_follow_up_at", "assigned_technician_id", "assigned_device_id", "created_at"],
     searchable: ["name", "phone", "whatsapp", "source", "location"],
     table: "leads",
   },

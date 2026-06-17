@@ -36,7 +36,7 @@ export const moduleConfigs = {
       { label: "Matured Leads", value: "18", detail: "Ready to schedule" },
       { label: "Conversion", value: "24%", detail: "+3.1% this month" },
     ],
-    tableColumns: ["Lead", "Phone", "Location", "Vehicle", "Stage", "Next Follow-up", "Created At", "Actions"],
+    tableColumns: ["Lead", "Phone", "Location", "Vehicle", "Technician", "Next Follow-up", "Created At", "Actions"],
     tableRows: [
       ["Ahmed Transport", "Facebook Ads", "Interested", "Sara Sales", "Today 4:00 PM"],
       ["Zain Courier", "WhatsApp", "Negotiation", "Usman Sales", "Tomorrow"],
@@ -77,7 +77,6 @@ export const moduleConfigs = {
   customers: {
     title: "Customer Management",
     activeHref: "/customers",
-    primaryAction: "Add Customer",
     description:
       "Maintain permanent customer records with vehicles, installed devices, SIM details, payments, warranty, support tickets, and reminders.",
     metrics: [
@@ -86,7 +85,7 @@ export const moduleConfigs = {
       { label: "Renewals Due", value: "64", detail: "Next 30 days" },
       { label: "Open Tickets", value: "28", detail: "6 high priority" },
     ],
-    tableColumns: ["Customer", "Phone", "Location", "Vehicle", "Suggested Techs", "Next Meeting", "Created At", "Actions"],
+    tableColumns: ["Customer", "Phone", "Location", "Vehicle", "Suggested Techs", "Follow-up Meeting", "Created At", "Actions"],
     tableRows: [
       ["Metro Fleet", "0300-1111111", "42", "865742091234688", "Active"],
       ["Al Noor Logistics", "0312-2222222", "18", "Pending Install", "N/A"],

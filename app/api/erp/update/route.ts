@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createConfigs, type CreateConfig, type CreateModuleKey } from "@/lib/create-config";
-import { getErpUserContext, requireRole } from "@/lib/erp-context";
+import { getErpUserContext, requireRole, organizationPayload } from "@/lib/erp-context";
 import { createClient } from "@/lib/supabase/server";
 
 export async function PATCH(request: Request) {
@@ -66,8 +66,17 @@ export async function PATCH(request: Request) {
     }
   }
 
-  if (moduleKey === "leads" && typeof values.next_follow_up_at === "string" && values.next_follow_up_at) {
-    payload.next_follow_up_at = values.next_follow_up_at;
+  if (moduleKey === "leads") {
+    if (typeof values.next_follow_up_at === "string" && values.next_follow_up_at) {
+      payload.next_follow_up_at = values.next_follow_up_at;
+    }
+    // Allow clearing or setting assigned technician and device
+    if ("assigned_technician_id" in values) {
+      payload.assigned_technician_id = values.assigned_technician_id ?? null;
+    }
+    if ("assigned_device_id" in values) {
+      payload.assigned_device_id = values.assigned_device_id ?? null;
+    }
   }
 
   const supabase = await createClient();
@@ -107,6 +116,84 @@ export async function PATCH(request: Request) {
     record_id: body.id,
     record_label: String(payload.imei ?? payload.name ?? payload.full_name ?? payload.status ?? "Record"),
   });
+
+  // Auto-promotion logic for leads
+  if (moduleKey === "leads") {
+    const { data: updatedLead, error: leadFetchError } = await supabase
+      .from("leads")
+      .select("id, name, phone, whatsapp, location, vehicle_type, budget, assigned_technician_id, assigned_device_id")
+      .eq("id", body.id)
+      .single();
+
+    if (!leadFetchError && updatedLead?.assigned_technician_id && updatedLead?.assigned_device_id) {
+      const { data: existingCustomer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("source_lead_id", updatedLead.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!existingCustomer) {
+        const { data: newCustomer, error: customerError } = await supabase
+          .from("customers")
+          .insert({
+            area: updatedLead.location,
+            budget: updatedLead.budget,
+            full_name: updatedLead.name,
+            location: updatedLead.location,
+            ...organizationPayload(context),
+            phone: updatedLead.phone,
+            source_lead_id: updatedLead.id,
+            vehicle_type: updatedLead.vehicle_type,
+            whatsapp: updatedLead.whatsapp,
+          })
+          .select("id")
+          .single();
+
+        if (!customerError && newCustomer) {
+          const { data: newVehicle } = await supabase
+            .from("vehicles")
+            .insert({
+              customer_id: newCustomer.id,
+              ...organizationPayload(context),
+              vehicle_type: updatedLead.vehicle_type,
+            })
+            .select("id")
+            .single();
+
+          await supabase.from("work_orders").insert({
+            customer_id: newCustomer.id,
+            lead_id: updatedLead.id,
+            ...organizationPayload(context),
+            status: "assigned",
+            vehicle_id: newVehicle?.id ?? null,
+            device_id: updatedLead.assigned_device_id,
+            technician_id: updatedLead.assigned_technician_id,
+          });
+
+          await supabase.from("devices").update({
+            technician_id: updatedLead.assigned_technician_id,
+            customer_id: newCustomer.id,
+            custody_status: "received_by_technician",
+            status: "assigned",
+            vehicle_id: newVehicle?.id ?? null,
+          }).eq("id", updatedLead.assigned_device_id);
+
+          await supabase.from("leads").update({
+            stage: "installation_scheduled"
+          }).eq("id", updatedLead.id);
+
+          await supabase.from("activity_events").insert({
+            created_by: context.userId,
+            event_type: "created",
+            module_key: "customers",
+            record_id: newCustomer.id,
+            record_label: `Auto-promoted from Lead: ${updatedLead.name}`,
+          });
+        }
+      }
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

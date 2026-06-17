@@ -10,7 +10,7 @@ import { CreateRecordForm } from "./create-record-form";
 import { LoadingSpinner } from "./loading-spinner";
 
 type AdminRecordsPanelProps = {
-  actionLabel: string;
+  actionLabel?: string;
   children: ReactNode;
   config?: CreateConfig;
   eyebrow: string;
@@ -85,7 +85,7 @@ export function AdminRecordsPanel({
                 type="button"
               >
                 {open ? <X className="size-4" /> : <Plus className="size-4" />}
-                {open ? "Close" : actionLabel}
+                {open ? "Close" : (actionLabel || "Add")}
               </button>
             ) : null}
           </div>

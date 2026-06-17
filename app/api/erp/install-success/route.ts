@@ -96,25 +96,56 @@ export async function POST(request: Request) {
 
   const finalVehicleId = vehicle?.id ?? device.vehicle_id ?? null;
 
-  const { data: workOrder, error: workOrderError } = await supabase
+  let workOrder;
+  const { data: existingWo } = await supabase
     .from("work_orders")
-    .insert({
-      activation_confirmed: true,
-      completed_at: completedAt,
-      created_at: completedAt,
-      customer_id: body.customerId,
-      device_id: body.deviceId,
-      ...organizationPayload(context),
-      scheduled_at: completedAt,
-      status: "completed",
-      technician_id: body.technicianId,
-      vehicle_id: finalVehicleId,
-    })
     .select("id")
-    .single();
+    .eq("customer_id", body.customerId)
+    .eq("device_id", body.deviceId)
+    .in("status", ["assigned", "in_progress"])
+    .limit(1)
+    .maybeSingle();
 
-  if (workOrderError) {
-    return NextResponse.json({ error: workOrderError.message }, { status: 400 });
+  if (existingWo) {
+    const { data: updatedWo, error: workOrderError } = await supabase
+      .from("work_orders")
+      .update({
+        activation_confirmed: true,
+        completed_at: completedAt,
+        status: "completed",
+        technician_id: body.technicianId,
+        vehicle_id: finalVehicleId,
+      })
+      .eq("id", existingWo.id)
+      .select("id")
+      .single();
+
+    if (workOrderError) {
+      return NextResponse.json({ error: workOrderError.message }, { status: 400 });
+    }
+    workOrder = updatedWo;
+  } else {
+    const { data: newWo, error: workOrderError } = await supabase
+      .from("work_orders")
+      .insert({
+        activation_confirmed: true,
+        completed_at: completedAt,
+        created_at: completedAt,
+        customer_id: body.customerId,
+        device_id: body.deviceId,
+        ...organizationPayload(context),
+        scheduled_at: completedAt,
+        status: "completed",
+        technician_id: body.technicianId,
+        vehicle_id: finalVehicleId,
+      })
+      .select("id")
+      .single();
+
+    if (workOrderError) {
+      return NextResponse.json({ error: workOrderError.message }, { status: 400 });
+    }
+    workOrder = newWo;
   }
 
   const salePrice = numberOrZero(body.salePrice);

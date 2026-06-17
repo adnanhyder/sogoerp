@@ -676,7 +676,8 @@ async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
 async function leadRows(supabase: SupabaseClient, searchQuery = "") {
   let query = supabase
     .from("leads")
-    .select("id,name,phone,whatsapp,source,location,vehicle_type,budget,stage,next_follow_up_at,created_at")
+    .select("id,name,phone,whatsapp,source,location,vehicle_type,budget,stage,next_follow_up_at,assigned_technician_id,assigned_device_id,created_at,technicians(name),devices(imei)")
+    .or("assigned_technician_id.is.null,assigned_device_id.is.null")
     .order("created_at", { ascending: false });
 
   const trimmedSearch = searchQuery.trim();
@@ -691,21 +692,32 @@ async function leadRows(supabase: SupabaseClient, searchQuery = "") {
     throw error;
   }
 
-  return ((data ?? []) as Record<string, unknown>[]).map((row) => [
-    String(row.id ?? ""),
-    String(row.stage ?? "new_lead"),
-    String(row.next_follow_up_at ?? ""),
-    String(row.name ?? "-"),
-    String(row.phone ?? "-"),
-    String(row.whatsapp ?? ""),
-    String(row.source ?? ""),
-    String(row.location ?? "-"),
-    String(row.vehicle_type ?? "-"),
-    String(row.budget ?? "0"),
-    String(row.stage ?? "-").replaceAll("_", " "),
-    formatDateTime(String(row.next_follow_up_at ?? "")),
-    formatDateTime(String(row.created_at ?? "")),
-  ]);
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => {
+    const techObj = row.technicians as Record<string, unknown> | null;
+    const techName = techObj?.name ? String(techObj.name) : "";
+    const deviceObj = row.devices as Record<string, unknown> | null;
+    const deviceImei = deviceObj?.imei ? String(deviceObj.imei) : "";
+    
+    return [
+      String(row.id ?? ""),
+      String(row.stage ?? "new_lead"),
+      String(row.next_follow_up_at ?? ""),
+      String(row.name ?? "-"),
+      String(row.phone ?? "-"),
+      String(row.whatsapp ?? ""),
+      String(row.source ?? ""),
+      String(row.location ?? "-"),
+      String(row.vehicle_type ?? "-"),
+      String(row.budget ?? "0"),
+      String(row.stage ?? "-").replaceAll("_", " "),
+      formatDateTime(String(row.next_follow_up_at ?? "")),
+      formatDateTime(String(row.created_at ?? "")),
+      String(row.assigned_technician_id ?? ""),
+      techName,
+      String(row.assigned_device_id ?? ""),
+      deviceImei,
+    ];
+  });
 }
 
 function technicianMatchScore(customerLocation: string, technician: Record<string, unknown>) {
@@ -731,7 +743,7 @@ function technicianMatchScore(customerLocation: string, technician: Record<strin
 async function customerRows(supabase: SupabaseClient, searchQuery = "") {
   let query = supabase
     .from("customers")
-    .select("id,full_name,phone,whatsapp,email,address,area,location,vehicle_type,budget,notes,created_at")
+    .select("id,full_name,phone,whatsapp,email,address,area,location,vehicle_type,budget,notes,source_lead_id,created_at")
     .order("created_at", { ascending: false });
 
   const trimmedSearch = searchQuery.trim();
@@ -759,7 +771,11 @@ async function customerRows(supabase: SupabaseClient, searchQuery = "") {
 
   const rows = (data ?? []) as Record<string, unknown>[];
   const customerIds = rows.map((row) => String(row.id ?? "")).filter(Boolean);
-  const meetingsByCustomer = await latestMeetingsByCustomer(supabase, customerIds);
+  const leadIds = rows.map((row) => String(row.source_lead_id ?? "")).filter(Boolean);
+  const [followUpsByLead, installStatuses] = await Promise.all([
+    latestFollowUpsByLead(supabase, leadIds),
+    installStatusByCustomer(supabase, customerIds),
+  ]);
   const technicianRowsData = (technicians ?? []) as Record<string, unknown>[];
 
   return rows.map((row) => {
@@ -772,7 +788,7 @@ async function customerRows(supabase: SupabaseClient, searchQuery = "") {
       .slice(0, 3)
       .map((match) => String(match.technician.name ?? "-"))
       .join(", ");
-    const nextMeeting = meetingsByCustomer.get(customerId);
+    const nextFollowUp = followUpsByLead.get(String(row.source_lead_id ?? ""));
 
     return [
       customerId,
@@ -787,42 +803,43 @@ async function customerRows(supabase: SupabaseClient, searchQuery = "") {
       String(row.budget ?? "0"),
       String(row.notes ?? ""),
       suggested || "No area match",
-      nextMeeting ?? "-",
+      nextFollowUp ?? "-",
       formatDateTime(String(row.created_at ?? "")),
+      installStatuses.get(customerId) ?? "none",
+      String(row.source_lead_id ?? ""),
     ];
   });
 }
 
-async function latestMeetingsByCustomer(supabase: SupabaseClient, customerIds: string[]) {
-  const meetings = new Map<string, string>();
+async function latestFollowUpsByLead(supabase: SupabaseClient, leadIds: string[]) {
+  const followUps = new Map<string, string>();
 
-  if (!customerIds.length) {
-    return meetings;
+  if (!leadIds.length) {
+    return followUps;
   }
 
   const { data, error } = await supabase
-    .from("customer_meetings")
-    .select("customer_id,scheduled_at,status,technicians(name)")
-    .in("customer_id", customerIds)
-    .in("status", ["scheduled", "rescheduled"])
-    .order("scheduled_at", { ascending: true });
+    .from("leads_followups")
+    .select("lead_id,next_follow_up_at")
+    .in("lead_id", leadIds)
+    .not("next_follow_up_at", "is", null)
+    .order("next_follow_up_at", { ascending: false });
 
   if (error) {
     throw error;
   }
 
   for (const row of (data ?? []) as Record<string, unknown>[]) {
-    const customerId = String(row.customer_id ?? "");
+    const leadId = String(row.lead_id ?? "");
 
-    if (!customerId || meetings.has(customerId)) {
+    if (!leadId || followUps.has(leadId)) {
       continue;
     }
 
-    const technicianName = relatedField(row.technicians, "name") ?? "Technician";
-    meetings.set(customerId, `${formatDateTime(String(row.scheduled_at ?? ""))} / ${technicianName}`);
+    followUps.set(leadId, formatDateTime(String(row.next_follow_up_at ?? "")));
   }
 
-  return meetings;
+  return followUps;
 }
 
 async function deviceCountsByTechnician(supabase: SupabaseClient, technicianIds: string[]) {
@@ -958,4 +975,27 @@ async function tableRows(supabase: SupabaseClient, table: string, columns: strin
       return String(value);
     }),
   );
+}
+
+async function installStatusByCustomer(supabase: SupabaseClient, customerIds: string[]) {
+  const statusMap = new Map<string, string>();
+  if (!customerIds.length) return statusMap;
+
+  const { data, error } = await supabase
+    .from("work_orders")
+    .select("customer_id,status")
+    .in("customer_id", customerIds);
+
+  if (!error && data) {
+    for (const row of data) {
+      const cid = String(row.customer_id);
+      const currentStatus = statusMap.get(cid);
+      if (row.status === "assigned" || row.status === "in_progress") {
+        statusMap.set(cid, "pending");
+      } else if (row.status === "completed" && currentStatus !== "pending") {
+        statusMap.set(cid, "completed");
+      }
+    }
+  }
+  return statusMap;
 }

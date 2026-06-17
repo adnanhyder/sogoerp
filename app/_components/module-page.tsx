@@ -21,7 +21,7 @@ type ModulePageProps = {
   databaseError?: string | null;
   description: string;
   metrics: readonly ModuleMetric[];
-  primaryAction: string;
+  primaryAction?: string;
   searchQuery?: string;
   tableColumns: readonly string[];
   tableRows: readonly (readonly string[])[];
@@ -158,7 +158,7 @@ export function ModulePage({
                 : isTechnicians
                   ? [row[6] ?? "", row[8] ?? "", row[9] ?? "", row[10] ?? "", row[13] ?? "", row[14] ?? ""]
                   : isLeads
-                    ? [row[3] ?? "", row[4] ?? "", row[7] ?? "", row[8] ?? "", row[10] ?? "", row[11] ?? "", row[12] ?? ""]
+                    ? [row[3] ?? "", row[4] ?? "", row[7] ?? "", row[8] ?? "", row[14] ? `👷 ${row[14]}` : "—", row[11] ?? "", row[12] ?? ""]
                     : isCustomers
                       ? [row[1] ?? "", row[2] ?? "", row[7] ?? "", row[8] ?? "", row[11] ?? "", row[12] ?? "", row[13] ?? ""]
                       : row;
@@ -210,6 +210,10 @@ export function ModulePage({
                   {isLeads ? (
                     <td className="px-4 py-4 align-middle">
                       <LeadRecordActions
+                        assignedDeviceId={row[15] ?? ""}
+                        assignedDeviceImei={row[16] ?? ""}
+                        assignedTechnicianId={row[13] ?? ""}
+                        assignedTechnicianName={row[14] ?? ""}
                         budget={row[9] ?? "0"}
                         followUpAt={row[2] ?? ""}
                         id={row[0] ?? ""}
@@ -230,6 +234,7 @@ export function ModulePage({
                         installStatus={row[14] ?? "none"}
                         location={`${row[7] ?? ""} ${row[6] ?? ""} ${row[5] ?? ""}`}
                         name={row[1] ?? "Customer"}
+                        sourceLeadId={row[15] ?? ""}
                       />
                     </td>
                   ) : null}
