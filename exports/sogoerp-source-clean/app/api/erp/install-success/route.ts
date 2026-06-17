@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     commissionAmount?: string;
     completedAt?: string;
+    customerId?: string;
     deviceId?: string;
     salePrice?: string;
     technicianId?: string;
@@ -27,6 +28,10 @@ export async function POST(request: Request) {
 
   if (!body.deviceId) {
     return NextResponse.json({ error: "Device is required." }, { status: 400 });
+  }
+
+  if (!body.customerId) {
+    return NextResponse.json({ error: "Customer is required." }, { status: 400 });
   }
 
   if (!body.technicianId) {
@@ -50,6 +55,7 @@ export async function POST(request: Request) {
     .from("devices")
     .select("id,imei,customer_id,vehicle_id")
     .eq("id", body.deviceId)
+    .eq("organization_id", context.organizationId)
     .single();
 
   if (deviceError || !device) {
@@ -72,19 +78,30 @@ export async function POST(request: Request) {
     );
   }
 
+  // Fetch customer's primary vehicle if they have one
+  const { data: vehicle } = await supabase
+    .from("vehicles")
+    .select("id")
+    .eq("customer_id", body.customerId)
+    .eq("organization_id", context.organizationId)
+    .limit(1)
+    .maybeSingle();
+
+  const finalVehicleId = vehicle?.id ?? device.vehicle_id ?? null;
+
   const { data: workOrder, error: workOrderError } = await supabase
     .from("work_orders")
     .insert({
       activation_confirmed: true,
       completed_at: completedAt,
       created_at: completedAt,
-      customer_id: device.customer_id,
+      customer_id: body.customerId,
       device_id: body.deviceId,
       ...organizationPayload(context),
       scheduled_at: completedAt,
       status: "completed",
       technician_id: body.technicianId,
-      vehicle_id: device.vehicle_id,
+      vehicle_id: finalVehicleId,
     })
     .select("id")
     .single();
@@ -103,10 +120,12 @@ export async function POST(request: Request) {
     .from("devices")
     .update({
       custody_status: "customer_hands",
+      customer_id: body.customerId,
       installation_date: completedAt.slice(0, 10),
       sale_price: salePrice,
       status: "installed",
       technician_id: body.technicianId,
+      vehicle_id: finalVehicleId,
     })
     .eq("id", body.deviceId);
 
@@ -138,7 +157,7 @@ export async function POST(request: Request) {
       entry_type: "income",
       occurred_on: completedAt.slice(0, 10),
       ...organizationPayload(context),
-      related_customer_id: device.customer_id,
+      related_customer_id: body.customerId,
       related_work_order_id: workOrder.id,
     });
 
