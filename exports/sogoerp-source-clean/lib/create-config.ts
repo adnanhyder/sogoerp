@@ -3,7 +3,7 @@ export type CreateField = {
   name: string;
   options?: readonly string[];
   required?: boolean;
-  type: "checkbox" | "customer-select" | "date" | "datetime-local" | "number" | "select" | "technician-select" | "text";
+  type: "checkbox" | "customer-select" | "date" | "datetime-local" | "number" | "select" | "technician-select" | "text" | "vehicle-selector";
 };
 
 export type CreateConfig = {
@@ -35,8 +35,8 @@ export const createConfigs = {
       { label: "Address", name: "address", type: "text" },
       { label: "Area", name: "area", type: "text" },
       { label: "Location / City", name: "location", type: "text" },
-      { label: "Vehicle Type", name: "vehicle_type", type: "text" },
-      { label: "Budget", name: "budget", type: "number" },
+      { label: "Vehicle Selection", name: "vehicle_type", type: "vehicle-selector" },
+      { label: "Total Cost", name: "budget", type: "number" },
       { label: "Admin Notes", name: "notes", type: "text" },
       { label: "Created Date & Time", name: "created_at", type: "datetime-local" },
     ],
@@ -102,8 +102,8 @@ export const createConfigs = {
       { label: "WhatsApp", name: "whatsapp", type: "text" },
       { label: "Source", name: "source", type: "text" },
       { label: "Client Location / Area", name: "location", type: "text" },
-      { label: "Vehicle Type", name: "vehicle_type", type: "text" },
-      { label: "Budget", name: "budget", type: "number" },
+      { label: "Vehicle Selection", name: "vehicle_type", type: "vehicle-selector" },
+      { label: "Total Cost", name: "budget", type: "number" },
       {
         label: "Stage",
         name: "stage",

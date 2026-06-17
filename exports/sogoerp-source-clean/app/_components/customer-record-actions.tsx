@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, CheckCircle2, RotateCcw } from "lucide-react";
+import { CalendarClock, CheckCircle2, RotateCcw, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LoadingSpinner } from "./loading-spinner";
@@ -16,6 +16,7 @@ type TechnicianOption = {
 
 type CustomerRecordActionsProps = {
   customerId: string;
+  installStatus?: string;
   location: string;
   name: string;
 };
@@ -35,7 +36,7 @@ function isSuggested(location: string, technician: TechnicianOption) {
     .some((part) => part.length > 2 && coverage.includes(part));
 }
 
-export function CustomerRecordActions({ customerId, location, name }: CustomerRecordActionsProps) {
+export function CustomerRecordActions({ customerId, installStatus = "none", location, name }: CustomerRecordActionsProps) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -155,6 +156,34 @@ export function CustomerRecordActions({ customerId, location, name }: CustomerRe
     router.refresh();
   }
 
+  async function deleteCustomer() {
+    if (!confirm(`Are you sure you want to permanently delete ${name}? This will also remove their vehicles, work orders, meetings, and insurance policies. Any installed devices will be returned to inventory.`)) {
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
+    const response = await fetch("/api/erp/delete", {
+      body: JSON.stringify({
+        id: customerId,
+        moduleKey: "customers",
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+    const payload = (await response.json()) as { error?: string };
+
+    setLoading(false);
+
+    if (!response.ok) {
+      setError(payload.error ?? "Failed to delete customer.");
+      return;
+    }
+
+    router.refresh();
+  }
+
   return (
     <div className="flex min-w-[260px] flex-col gap-2">
       <button
@@ -168,18 +197,36 @@ export function CustomerRecordActions({ customerId, location, name }: CustomerRe
         {open ? "Close" : "Meeting"}
       </button>
 
+      {installStatus === "completed" ? (
+        <span className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-green-200 bg-green-50 px-3 py-2 text-xs font-bold text-green-700">
+          <CheckCircle2 className="size-3" />
+          Success
+        </span>
+      ) : (
+        <button
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-green-200 bg-green-50 px-3 py-2 text-xs font-bold text-green-700 transition hover:border-green-500 disabled:cursor-wait disabled:opacity-50"
+          disabled={loading || isInstalling}
+          onClick={() => {
+            setOpen(false);
+            setIsInstallOpen((current) => !current);
+          }}
+          title={`Record installation success for ${name}`}
+          type="button"
+        >
+          <CheckCircle2 className="size-3" />
+          {isInstallOpen ? "Cancel" : "Success"}
+        </button>
+      )}
+
       <button
-        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-green-200 bg-green-50 px-3 py-2 text-xs font-bold text-green-700 transition hover:border-green-500 disabled:cursor-wait disabled:opacity-50"
-        disabled={loading || isInstalling}
-        onClick={() => {
-          setOpen(false);
-          setIsInstallOpen((current) => !current);
-        }}
-        title={`Record installation success for ${name}`}
+        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition hover:border-red-500 disabled:cursor-wait disabled:opacity-50"
+        disabled={loading}
+        onClick={deleteCustomer}
+        title={`Delete ${name}`}
         type="button"
       >
-        <CheckCircle2 className="size-3" />
-        {isInstallOpen ? "Cancel" : "Success"}
+        <Trash className="size-3" />
+        Delete
       </button>
 
       {open ? (

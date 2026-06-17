@@ -170,121 +170,153 @@ export function InventoryRecordActions({
       </div>
 
       {isEditing ? (
-        <div className="w-[280px] rounded-[8px] border border-[#d2d2d2] bg-white p-3 shadow-[0_14px_35px_rgba(0,0,0,0.12)]">
-          <div className="grid gap-2">
-            <label className="text-xs font-bold text-black">
-              IMEI
-              <input
-                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-medium outline-none focus:border-black"
-                onChange={(event) => setDraftImei(event.target.value)}
-                value={draftImei}
-              />
-            </label>
-            <label className="text-xs font-bold text-black">
-              Device Status
-              <input
-                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-medium outline-none focus:border-black"
-                onChange={(event) => setDraftStatus(event.target.value)}
-                placeholder="clear, disputed, faulty..."
-                value={draftStatus}
-              />
-            </label>
-            <label className="text-xs font-bold text-black">
-              Custody
-              <select
-                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] bg-white px-2 text-xs font-medium outline-none focus:border-black"
-                onChange={(event) => {
-                  const newCustody = event.target.value;
-                  setDraftCustody(newCustody);
-                  
-                  const custodyToStatusMap: Record<string, string> = {
-                    company_hands: "clear",
-                    on_the_way: "assigned",
-                    received_by_technician: "assigned",
-                    customer_hands: "installed",
-                    returned: "returned",
-                  };
-                  if (custodyToStatusMap[newCustody]) {
-                    setDraftStatus(custodyToStatusMap[newCustody]);
-                  }
-
-                  if (newCustody !== "received_by_technician" && newCustody !== "on_the_way") {
-                    setDraftTechnicianId("");
-                  }
-                }}
-                value={draftCustody}
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="w-full max-w-[500px] rounded-[24px] bg-white p-8 shadow-2xl animate-[slideUpFade_0.3s_ease-out_both] max-h-[90vh] overflow-y-auto">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Edit Inventory Device</h3>
+                <p className="text-sm text-gray-500 font-medium">Device: {imei}</p>
+              </div>
+              <button
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                onClick={() => setIsEditing(false)}
+                type="button"
               >
-                {custodyOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option.replaceAll("_", " ")}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-xs font-bold text-black">
-              Received By Technician
-              <select
-                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] bg-white px-2 text-xs font-medium outline-none focus:border-black"
-                onChange={(event) => {
-                  const newTechId = event.target.value;
-                  setDraftTechnicianId(newTechId);
-
-                  if (newTechId) {
-                    if (draftCustody !== "on_the_way") {
-                      setDraftCustody("received_by_technician");
-                      setDraftStatus("assigned");
+                <X className="size-5" />
+              </button>
+            </div>
+            
+            <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
+              <label className="block sm:col-span-2">
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">IMEI</span>
+                <input
+                  className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  onChange={(event) => setDraftImei(event.target.value)}
+                  value={draftImei}
+                />
+              </label>
+              
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Device Status</span>
+                <input
+                  className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  onChange={(event) => setDraftStatus(event.target.value)}
+                  placeholder="clear, disputed, faulty..."
+                  value={draftStatus}
+                />
+              </label>
+              
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Custody</span>
+                <select
+                  className="h-12 w-full rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  onChange={(event) => {
+                    const newCustody = event.target.value;
+                    setDraftCustody(newCustody);
+                    
+                    const custodyToStatusMap: Record<string, string> = {
+                      company_hands: "clear",
+                      on_the_way: "assigned",
+                      received_by_technician: "assigned",
+                      customer_hands: "installed",
+                      returned: "returned",
+                    };
+                    if (custodyToStatusMap[newCustody]) {
+                      setDraftStatus(custodyToStatusMap[newCustody]);
                     }
-                  } else {
-                    if (draftCustody === "received_by_technician" || draftCustody === "on_the_way") {
-                      setDraftCustody("company_hands");
-                      setDraftStatus("clear");
+  
+                    if (newCustody !== "received_by_technician" && newCustody !== "on_the_way") {
+                      setDraftTechnicianId("");
                     }
-                  }
-                }}
-                value={draftTechnicianId}
+                  }}
+                  value={draftCustody}
+                >
+                  {custodyOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option.replaceAll("_", " ")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              
+              <label className="block sm:col-span-2">
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Received By Technician</span>
+                <select
+                  className="h-12 w-full rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  onChange={(event) => {
+                    const newTechId = event.target.value;
+                    setDraftTechnicianId(newTechId);
+  
+                    if (newTechId) {
+                      if (draftCustody !== "on_the_way") {
+                        setDraftCustody("received_by_technician");
+                        setDraftStatus("assigned");
+                      }
+                    } else {
+                      if (draftCustody === "received_by_technician" || draftCustody === "on_the_way") {
+                        setDraftCustody("company_hands");
+                        setDraftStatus("clear");
+                      }
+                    }
+                  }}
+                  value={draftTechnicianId}
+                >
+                  <option value="">No technician selected</option>
+                  {technicians.map((technician) => (
+                    <option key={technician.id} value={technician.id}>
+                      {technician.name} / {technician.cities || "No city"} / {technician.deviceCount} devices
+                      {!technician.active ? " / blocked" : ""}
+                    </option>
+                  ))}
+                </select>
+                {!technicians.length ? (
+                  <span className="mt-1 block text-[11px] font-semibold text-red-600">
+                    No technicians loaded. Add or unblock a technician first.
+                  </span>
+                ) : null}
+              </label>
+              
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Purchase Cost</span>
+                <input
+                  className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  onChange={(event) => setDraftPurchaseCost(event.target.value)}
+                  step="0.01"
+                  type="number"
+                  value={draftPurchaseCost}
+                />
+              </label>
+              
+              <label className="flex h-12 items-center gap-3 rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 cursor-pointer hover:bg-gray-50 transition-colors">
+                <input
+                  checked={draftHasMic}
+                  className="size-5 accent-[#FAC54D] rounded text-[#FAC54D] focus:ring-[#FAC54D]"
+                  onChange={(event) => setDraftHasMic(event.target.checked)}
+                  type="checkbox"
+                />
+                With Mic
+              </label>
+            </div>
+            
+            <div className="mt-8 flex justify-end gap-3 border-t border-gray-100 pt-6">
+              <button
+                className="inline-flex h-12 items-center justify-center rounded-[12px] border-2 border-gray-200 bg-white px-6 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 focus:border-gray-300 focus:ring-4 focus:ring-gray-200/50 disabled:opacity-50"
+                onClick={() => setIsEditing(false)}
+                type="button"
+                disabled={busy}
               >
-                <option value="">No technician selected</option>
-                {technicians.map((technician) => (
-                  <option key={technician.id} value={technician.id}>
-                    {technician.name} / {technician.cities || "No city"} / {technician.deviceCount} devices
-                    {!technician.active ? " / blocked" : ""}
-                  </option>
-                ))}
-              </select>
-              {!technicians.length ? (
-                <span className="mt-1 block text-[11px] font-semibold text-red-600">
-                  No technicians loaded. Add or unblock a technician first.
-                </span>
-              ) : null}
-            </label>
-            <label className="text-xs font-bold text-black">
-              Purchase Cost
-              <input
-                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-medium outline-none focus:border-black"
-                onChange={(event) => setDraftPurchaseCost(event.target.value)}
-                step="0.01"
-                type="number"
-                value={draftPurchaseCost}
-              />
-            </label>
-            <label className="flex h-9 items-center gap-2 rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-bold text-black">
-              <input
-                checked={draftHasMic}
-                className="size-4 accent-black"
-                onChange={(event) => setDraftHasMic(event.target.checked)}
-                type="checkbox"
-              />
-              With Mic
-            </label>
-            <button
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-[6px] bg-black px-3 text-xs font-bold text-white disabled:cursor-wait disabled:bg-[#343434]"
-              disabled={busy}
-              onClick={saveRecord}
-              type="button"
-            >
-              {isSaving ? <LoadingSpinner className="size-3" /> : null}
-              {isSaving ? "Saving" : "Save Changes"}
-            </button>
+                Cancel
+              </button>
+              <button
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-[12px] bg-[#FAC54D] px-8 text-sm font-bold text-gray-900 shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#e0b040] hover:shadow-lg focus:ring-4 focus:ring-[#FAC54D]/30 disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0"
+                disabled={busy}
+                onClick={saveRecord}
+                type="button"
+              >
+                {isSaving ? <LoadingSpinner className="size-4" /> : null}
+                {isSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

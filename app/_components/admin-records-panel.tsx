@@ -25,7 +25,7 @@ function SearchButton() {
 
   return (
     <button
-      className="inline-flex h-11 items-center justify-center gap-2 rounded-[6px] bg-black px-4 text-sm font-bold text-white disabled:cursor-wait disabled:bg-[#343434]"
+      className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#FAC54D] px-6 text-sm font-bold text-gray-900 transition-all hover:-translate-y-0.5 hover:bg-[#e0b040] hover:shadow-md disabled:cursor-wait disabled:opacity-70"
       disabled={pending}
       type="submit"
     >
@@ -59,7 +59,7 @@ export function AdminRecordsPanel({
           {searchAction ? (
             <form action={searchAction} className="flex flex-col gap-2 sm:flex-row" method="get">
               <input
-                className="h-11 w-full rounded-[6px] border border-[#d2d2d2] bg-white px-3 text-sm text-black outline-none placeholder:text-[#999999] focus:border-black sm:w-[280px]"
+                className="h-11 w-full rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20 sm:w-[280px]"
                 defaultValue={searchQuery}
                 name="q"
                 placeholder={searchPlaceholder}
@@ -72,7 +72,7 @@ export function AdminRecordsPanel({
           <div className="flex gap-2">
             {searchAction && searchQuery ? (
               <Link
-                className="inline-flex h-10 items-center justify-center rounded-[6px] border border-[#d2d2d2] bg-white px-4 text-sm font-bold text-black"
+                className="inline-flex h-11 items-center justify-center rounded-[10px] border-2 border-gray-200 bg-white px-5 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
                 href={searchAction}
               >
                 Clear

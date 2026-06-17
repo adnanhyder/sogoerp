@@ -1,5 +1,8 @@
 import { ModuleRoute } from "../_components/module-route";
 
-export default async function TechniciansPage() {
-  return <ModuleRoute moduleKey="technicians" />;
+export default async function TechniciansPage(props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const searchParams = await props.searchParams;
+  const q = typeof searchParams?.q === "string" ? searchParams.q : "";
+  return <ModuleRoute moduleKey="technicians" searchQuery={q} />;
 }
+

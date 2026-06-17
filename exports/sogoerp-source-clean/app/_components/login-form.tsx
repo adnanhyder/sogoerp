@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { LoadingSpinner } from "./loading-spinner";
+import { AlertModal } from "./alert-modal";
 
 type LoginFormProps = {
   initialEmail?: string;
@@ -62,6 +63,8 @@ export function LoginForm({ initialEmail = "", notice = "" }: LoginFormProps) {
   const [remember, setRemember] = useState(initialState.remember);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [showAlert, setShowAlert] = useState(false);
+  const [hideNotice, setHideNotice] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -85,6 +88,7 @@ export function LoginForm({ initialEmail = "", notice = "" }: LoginFormProps) {
           ? "Invalid login credentials. If this account was just registered, Supabase may still require email confirmation. Turn off Confirm email, then register again."
           : signInError.message,
       );
+      setShowAlert(true);
       return;
     }
 
@@ -95,6 +99,7 @@ export function LoginForm({ initialEmail = "", notice = "" }: LoginFormProps) {
     }
 
     setSuccess("Login approved. Opening dashboard.");
+    setShowAlert(true);
     window.setTimeout(() => {
       router.push("/dashboard");
       router.refresh();
@@ -103,20 +108,17 @@ export function LoginForm({ initialEmail = "", notice = "" }: LoginFormProps) {
 
   return (
     <form className="mt-9 max-w-md space-y-4" onSubmit={handleSubmit}>
-      {notice || error || success ? (
-        <div
-          aria-label={error || success || notice}
-          className={`auth-phone-signal ${
-            error ? "auth-ios-alert-error" : "auth-ios-alert-success"
-          }`}
-        >
-          <span className="auth-ios-alert-light" />
-        </div>
-      ) : null}
-
-      {notice || error || success ? (
-        <p className="auth-form-message">{error || success || notice}</p>
-      ) : null}
+      <AlertModal
+        cancelText="Okay"
+        description={error || success || notice}
+        isOpen={showAlert || (!!notice && !hideNotice)}
+        onClose={() => {
+          setShowAlert(false);
+          setHideNotice(true);
+        }}
+        title={error ? "Login Failed" : success ? "Login Successful" : "Notice"}
+        type={error ? "danger" : success ? "success" : "info"}
+      />
 
       <label className="block">
         <span className="mb-2 block text-sm font-semibold text-black">Email</span>

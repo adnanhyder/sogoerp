@@ -211,28 +211,55 @@ export function TechnicianRecordActions({
       </div>
 
       {isEditing ? (
-        <div className="w-[320px] rounded-[8px] border border-[#d2d2d2] bg-white p-3 shadow-[0_14px_35px_rgba(0,0,0,0.12)]">
-          <div className="grid gap-2">
-            {editFields.map(([label, value, setter, type]) => (
-              <label className="text-xs font-bold text-black" key={label}>
-                {label}
-                <input
-                  className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-medium outline-none focus:border-black"
-                  onChange={(event) => setter(event.target.value)}
-                  type={type}
-                  value={value}
-                />
-              </label>
-            ))}
-            <button
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-[6px] bg-black px-3 text-xs font-bold text-white disabled:cursor-wait disabled:bg-[#343434]"
-              disabled={busy}
-              onClick={saveRecord}
-              type="button"
-            >
-              {isSaving ? <LoadingSpinner className="size-3" /> : null}
-              {isSaving ? "Saving" : "Save Changes"}
-            </button>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="w-full max-w-[600px] rounded-[24px] bg-white p-8 shadow-2xl animate-[slideUpFade_0.3s_ease-out_both] max-h-[90vh] overflow-y-auto">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Edit Technician</h3>
+                <p className="text-sm text-gray-500 font-medium">Technician: {name}</p>
+              </div>
+              <button
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                onClick={() => setIsEditing(false)}
+                type="button"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            
+            <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
+              {editFields.map(([label, value, setter, type]) => (
+                <label className="block" key={label}>
+                  <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">{label}</span>
+                  <input
+                    className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                    onChange={(event) => setter(event.target.value)}
+                    type={type}
+                    value={value}
+                  />
+                </label>
+              ))}
+            </div>
+            
+            <div className="mt-8 flex justify-end gap-3 border-t border-gray-100 pt-6">
+              <button
+                className="inline-flex h-12 items-center justify-center rounded-[12px] border-2 border-gray-200 bg-white px-6 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 focus:border-gray-300 focus:ring-4 focus:ring-gray-200/50 disabled:opacity-50"
+                onClick={() => setIsEditing(false)}
+                type="button"
+                disabled={busy}
+              >
+                Cancel
+              </button>
+              <button
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-[12px] bg-[#FAC54D] px-8 text-sm font-bold text-gray-900 shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#e0b040] hover:shadow-lg focus:ring-4 focus:ring-[#FAC54D]/30 disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0"
+                disabled={busy}
+                onClick={saveRecord}
+                type="button"
+              >
+                {isSaving ? <LoadingSpinner className="size-4" /> : null}
+                {isSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

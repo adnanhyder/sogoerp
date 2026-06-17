@@ -445,7 +445,7 @@ export async function getModuleData(
               { label: "Import Jobs", value: formatCount(await countRows(supabase, "import_jobs")), detail: "CSV/XLSX batches" },
               { label: "Export Jobs", value: formatCount(await countRows(supabase, "export_jobs")), detail: "Generated files" },
             ],
-            rows: await tableRows(supabase, "api_sources", ["name", "source_key", "active", "created_at"]),
+            rows: await tableRows(supabase, "api_sources", ["name", "source_key", "active", "created_at"], options.searchQuery),
           },
           error: null,
         };
@@ -458,7 +458,7 @@ export async function getModuleData(
               { label: "Matured Leads", value: formatCount(await countRows(supabase, "leads", (query) => query.eq("stage", "matured"))), detail: "Ready to schedule" },
               { label: "Total Leads", value: formatCount(await countRows(supabase, "leads")), detail: "All lead records" },
             ],
-            rows: await leadRows(supabase),
+            rows: await leadRows(supabase, options.searchQuery),
           },
           error: null,
         };
@@ -471,7 +471,7 @@ export async function getModuleData(
               { label: "Blocked", value: formatCount(await countRows(supabase, "technicians", (query) => query.eq("active", false))), detail: "Access blocked" },
               { label: "Disputed", value: formatCount(await countRows(supabase, "technicians", (query) => query.eq("disputed", true))), detail: "Marked for review" },
             ],
-            rows: await technicianRows(supabase),
+            rows: await technicianRows(supabase, options.searchQuery),
           },
           error: null,
         };
@@ -484,28 +484,28 @@ export async function getModuleData(
               { label: "Scheduled", value: formatCount(await countRows(supabase, "customer_meetings", (query) => query.in("status", ["scheduled", "rescheduled"]))), detail: "Open technician meetings" },
               { label: "Completed", value: formatCount(await countRows(supabase, "customer_meetings", (query) => query.eq("status", "completed"))), detail: "Finished customer meetings" },
             ],
-            rows: await customerRows(supabase),
+            rows: await customerRows(supabase, options.searchQuery),
           },
           error: null,
         };
       case "simConfig":
-        return moduleQuery(supabase, "sims", ["sim_number", "network_provider", "apn_settings", "activation_date", "active"]);
+        return moduleQuery(supabase, "sims", ["sim_number", "network_provider", "apn_settings", "activation_date", "active"], options.searchQuery);
       case "finance":
-        return moduleQuery(supabase, "finance_entries", ["category", "entry_type", "amount", "occurred_on", "note"]);
+        return moduleQuery(supabase, "finance_entries", ["category", "entry_type", "amount", "occurred_on", "note"], options.searchQuery);
       case "commissions":
-        return moduleQuery(supabase, "commissions", ["reason", "amount", "paid", "created_at"]);
+        return moduleQuery(supabase, "commissions", ["reason", "amount", "paid", "created_at"], options.searchQuery);
       case "whatsapp":
-        return moduleQuery(supabase, "communication_logs", ["channel", "direction", "message", "created_at"]);
+        return moduleQuery(supabase, "communication_logs", ["channel", "direction", "message", "created_at"], options.searchQuery);
       case "support":
-        return moduleQuery(supabase, "support_tickets", ["title", "priority", "status", "created_at"]);
+        return moduleQuery(supabase, "support_tickets", ["title", "priority", "status", "created_at"], options.searchQuery);
       case "documents":
-        return moduleQuery(supabase, "documents", ["document_type", "file_url", "created_at"]);
+        return moduleQuery(supabase, "documents", ["document_type", "file_url", "created_at"], options.searchQuery);
       case "insurance":
-        return moduleQuery(supabase, "insurance_policies", ["customer_name", "policy_name", "premium", "end_date", "status"]);
+        return moduleQuery(supabase, "insurance_policies", ["customer_name", "policy_name", "premium", "end_date", "status"], options.searchQuery);
       case "reports":
-        return moduleQuery(supabase, "report_definitions", ["name", "focus", "owner", "frequency", "status"]);
+        return moduleQuery(supabase, "report_definitions", ["name", "focus", "owner", "frequency", "status"], options.searchQuery);
       case "tracking":
-        return moduleQuery(supabase, "tracking_events", ["entity", "location", "signal", "last_update", "status"]);
+        return moduleQuery(supabase, "tracking_events", ["entity", "location", "signal", "last_update", "status"], options.searchQuery);
       case "settings":
         return {
           data: {
@@ -515,7 +515,7 @@ export async function getModuleData(
               { label: "Inbound Events", value: formatCount(await countRows(supabase, "inbound_events")), detail: "Received payloads" },
               { label: "Import Jobs", value: formatCount(await countRows(supabase, "import_jobs")), detail: "CSV/XLSX batches" },
             ],
-            rows: await tableRows(supabase, "settings_items", ["name", "area", "owner", "created_at", "status"]),
+            rows: await tableRows(supabase, "settings_items", ["name", "area", "owner", "created_at", "status"], options.searchQuery),
           },
           error: null,
         };
@@ -623,12 +623,19 @@ function technicianStatus(active: unknown, disputed: unknown) {
   return active ? "Active" : "Blocked";
 }
 
-async function technicianRows(supabase: SupabaseClient) {
-  const { data, error } = await supabase
+async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
+  let query = supabase
     .from("technicians")
     .select("id,name,cnic,cities,phone,authorization_person_name,authorization_person_phone,authorization_person_cnic,authorization_relation,commission_rate,active,disputed,created_at")
-    .order("created_at", { ascending: false })
-    .limit(10);
+    .order("created_at", { ascending: false });
+
+  const trimmedSearch = searchQuery.trim();
+  if (trimmedSearch) {
+    const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
+    query = query.or(`name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,cities.ilike.%${escapedSearch}%,cnic.ilike.%${escapedSearch}%`);
+  }
+
+  const { data, error } = await query.limit(trimmedSearch ? 50 : 10);
 
   if (error) {
     throw error;
@@ -666,12 +673,19 @@ async function technicianRows(supabase: SupabaseClient) {
   });
 }
 
-async function leadRows(supabase: SupabaseClient) {
-  const { data, error } = await supabase
+async function leadRows(supabase: SupabaseClient, searchQuery = "") {
+  let query = supabase
     .from("leads")
     .select("id,name,phone,whatsapp,source,location,vehicle_type,budget,stage,next_follow_up_at,created_at")
-    .order("created_at", { ascending: false })
-    .limit(10);
+    .order("created_at", { ascending: false });
+
+  const trimmedSearch = searchQuery.trim();
+  if (trimmedSearch) {
+    const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
+    query = query.or(`name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,location.ilike.%${escapedSearch}%,stage.ilike.%${escapedSearch}%`);
+  }
+
+  const { data, error } = await query.limit(trimmedSearch ? 50 : 10);
 
   if (error) {
     throw error;
@@ -714,13 +728,20 @@ function technicianMatchScore(customerLocation: string, technician: Record<strin
   return locationTokens.filter((part) => coverage.has(part)).length;
 }
 
-async function customerRows(supabase: SupabaseClient) {
+async function customerRows(supabase: SupabaseClient, searchQuery = "") {
+  let query = supabase
+    .from("customers")
+    .select("id,full_name,phone,whatsapp,email,address,area,location,vehicle_type,budget,notes,created_at")
+    .order("created_at", { ascending: false });
+
+  const trimmedSearch = searchQuery.trim();
+  if (trimmedSearch) {
+    const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
+    query = query.or(`full_name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,location.ilike.%${escapedSearch}%,area.ilike.%${escapedSearch}%`);
+  }
+
   const [{ data, error }, { data: technicians, error: technicianError }] = await Promise.all([
-    supabase
-      .from("customers")
-      .select("id,full_name,phone,whatsapp,email,address,area,location,vehicle_type,budget,notes,created_at")
-      .order("created_at", { ascending: false })
-      .limit(10),
+    query.limit(trimmedSearch ? 50 : 10),
     supabase
       .from("technicians")
       .select("id,name,cities,area_coverage,active")
@@ -882,7 +903,7 @@ async function workOrderCountsByTechnician(
   return counts;
 }
 
-async function moduleQuery(supabase: SupabaseClient, table: string, columns: string[]) {
+async function moduleQuery(supabase: SupabaseClient, table: string, columns: string[], searchQuery = "") {
   const count = await countRows(supabase, table);
 
   return {
@@ -893,18 +914,26 @@ async function moduleQuery(supabase: SupabaseClient, table: string, columns: str
         { label: "Pending", value: "-", detail: "Table-specific rule pending" },
         { label: "Alerts", value: "-", detail: "Table-specific rule pending" },
       ],
-      rows: await tableRows(supabase, table, columns),
+      rows: await tableRows(supabase, table, columns, searchQuery),
     },
     error: null,
   };
 }
 
-async function tableRows(supabase: SupabaseClient, table: string, columns: string[]) {
-  const { data, error } = await supabase
+async function tableRows(supabase: SupabaseClient, table: string, columns: string[], searchQuery = "") {
+  let query = supabase
     .from(table)
     .select(columns.join(","))
-    .order("created_at", { ascending: false })
-    .limit(10);
+    .order("created_at", { ascending: false });
+
+  const trimmedSearch = searchQuery.trim();
+  if (trimmedSearch) {
+    const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
+    const searchFilters = columns.map(col => `${col}.ilike.%${escapedSearch}%`).join(",");
+    query = query.or(searchFilters);
+  }
+
+  const { data, error } = await query.limit(trimmedSearch ? 50 : 10);
 
   if (error) {
     throw error;

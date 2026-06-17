@@ -227,6 +227,7 @@ export function ModulePage({
                     <td className="px-4 py-4 align-middle">
                       <CustomerRecordActions
                         customerId={row[0] ?? ""}
+                        installStatus={row[14] ?? "none"}
                         location={`${row[7] ?? ""} ${row[6] ?? ""} ${row[5] ?? ""}`}
                         name={row[1] ?? "Customer"}
                       />

@@ -241,7 +241,7 @@ export async function getDashboardData(
       countRows(supabase, "support_tickets"),
       sumFinance(supabase, "income", monthStart),
       sumFinance(supabase, "expense", monthStart),
-      sumCommissions(supabase),
+      sumCommissions(supabase, monthStart),
       countRows(supabase, "devices", (query) => query.eq("status", "purchased")),
       countRows(supabase, "devices", (query) => query.eq("status", "imei_approved")),
       countRows(supabase, "devices", (query) => query.eq("custody_status", "received_by_technician")),
@@ -249,7 +249,7 @@ export async function getDashboardData(
         query.in("status", ["installed", "activated_with_sim", "active"]),
       ),
       countRows(supabase, "work_orders", (query) =>
-        query.gte("created_at", todayStart).lt("created_at", tomorrowStart),
+        query.gte("scheduled_at", todayStart).lt("scheduled_at", tomorrowStart),
       ),
       countRows(supabase, "work_orders", (query) =>
         query.eq("status", "completed").gte("completed_at", todayStart).lt("completed_at", tomorrowStart),
@@ -399,8 +399,14 @@ export async function getDashboardData(
   }
 }
 
-async function sumCommissions(supabase: SupabaseClient) {
-  const { data, error } = await supabase.from("commissions").select("amount").eq("paid", false);
+async function sumCommissions(supabase: SupabaseClient, startDate?: string) {
+  let query = supabase.from("commissions").select("amount").eq("paid", false);
+
+  if (startDate) {
+    query = query.gte("created_at", startDate);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
@@ -732,7 +738,10 @@ async function customerRows(supabase: SupabaseClient) {
 
   const rows = (data ?? []) as Record<string, unknown>[];
   const customerIds = rows.map((row) => String(row.id ?? "")).filter(Boolean);
-  const meetingsByCustomer = await latestMeetingsByCustomer(supabase, customerIds);
+  const [meetingsByCustomer, installStatuses] = await Promise.all([
+    latestMeetingsByCustomer(supabase, customerIds),
+    installStatusByCustomer(supabase, customerIds),
+  ]);
   const technicianRowsData = (technicians ?? []) as Record<string, unknown>[];
 
   return rows.map((row) => {
@@ -762,8 +771,32 @@ async function customerRows(supabase: SupabaseClient) {
       suggested || "No area match",
       nextMeeting ?? "-",
       formatDateTime(String(row.created_at ?? "")),
+      installStatuses.get(customerId) ?? "none",
     ];
   });
+}
+
+async function installStatusByCustomer(supabase: SupabaseClient, customerIds: string[]) {
+  const statusMap = new Map<string, string>();
+  if (!customerIds.length) return statusMap;
+
+  const { data, error } = await supabase
+    .from("work_orders")
+    .select("customer_id,status")
+    .in("customer_id", customerIds);
+
+  if (!error && data) {
+    for (const row of data) {
+      const cid = String(row.customer_id);
+      const currentStatus = statusMap.get(cid);
+      if (row.status === "assigned" || row.status === "in_progress") {
+        statusMap.set(cid, "pending");
+      } else if (row.status === "completed" && currentStatus !== "pending") {
+        statusMap.set(cid, "completed");
+      }
+    }
+  }
+  return statusMap;
 }
 
 async function latestMeetingsByCustomer(supabase: SupabaseClient, customerIds: string[]) {
@@ -833,7 +866,7 @@ async function disputedDeviceCountsByTechnician(supabase: SupabaseClient, techni
     .from("devices")
     .select("technician_id")
     .in("technician_id", technicianIds)
-    .or("status.ilike.%disputed%,status.ilike.%fault%,status.ilike.%issue%");
+    .or("status.ilike.%disputed%,status.ilike.%fault%,status.ilike.%faulty%,status.ilike.%issue%,status.ilike.%returned%,status.ilike.%replaced%");
 
   if (error) {
     throw error;

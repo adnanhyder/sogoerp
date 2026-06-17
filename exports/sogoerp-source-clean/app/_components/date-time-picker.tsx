@@ -247,7 +247,7 @@ export function DateTimePicker({
           placeholder="Select date & time"
           value={displayText}
           onClick={toggleOpen}
-          className={`w-full cursor-pointer rounded-[6px] border border-[#d2d2d2] bg-white pr-10 pl-3 font-semibold text-black outline-none focus:border-black hover:border-black/50 transition-all duration-200 placeholder:text-black placeholder:font-normal ${className}`}
+          className={className ? className : "w-full cursor-pointer rounded-[6px] border border-[#d2d2d2] bg-white pr-10 pl-3 font-semibold text-black outline-none focus:border-black hover:border-black/50 transition-all duration-200 placeholder:text-black placeholder:font-normal"}
         />
         <Calendar
           className="absolute right-3 top-1/2 size-4 -translate-y-1/2 cursor-pointer text-[#999999] group-hover:text-black transition-colors duration-200"

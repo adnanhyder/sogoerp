@@ -1,5 +1,8 @@
 import { ModuleRoute } from "../_components/module-route";
 
-export default async function SupportPage() {
-  return <ModuleRoute moduleKey="support" />;
+export default async function SupportPage(props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const searchParams = await props.searchParams;
+  const q = typeof searchParams?.q === "string" ? searchParams.q : "";
+  return <ModuleRoute moduleKey="support" searchQuery={q} />;
 }
+

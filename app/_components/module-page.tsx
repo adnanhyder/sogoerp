@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { AdminRecordsPanel } from "./admin-records-panel";
 import { ErpShell } from "./erp-shell";
@@ -227,6 +227,7 @@ export function ModulePage({
                     <td className="px-4 py-4 align-middle">
                       <CustomerRecordActions
                         customerId={row[0] ?? ""}
+                        installStatus={row[14] ?? "none"}
                         location={`${row[7] ?? ""} ${row[6] ?? ""} ${row[5] ?? ""}`}
                         name={row[1] ?? "Customer"}
                       />
@@ -285,8 +286,8 @@ export function ModulePage({
               actionLabel={primaryAction}
               config={createConfig}
               eyebrow={isInventory ? "Admin Inventory" : "Admin Records"}
-              searchAction={isInventory ? "/inventory" : undefined}
-              searchPlaceholder="Search IMEI, status, custody..."
+              searchAction={activeHref}
+              searchPlaceholder="Search records..."
               searchQuery={searchQuery}
               title={`${title} Records`}
             >
@@ -376,9 +377,32 @@ export function ModulePage({
 
         <section className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
           <article className="rounded-[8px] border border-[#d2d2d2] bg-white p-5 sm:p-7">
-            <div className="mb-5 flex items-center justify-between">
+            <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-lg font-bold text-black">{title} Records</h3>
+              <form action={activeHref} className="flex flex-col gap-2 sm:flex-row" method="get">
+                <input
+                  className="h-11 w-full rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all placeholder:text-gray-400 focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20 sm:w-[280px]"
+                  defaultValue={searchQuery}
+                  name="q"
+                  placeholder="Search records..."
+                  type="search"
+                />
+                <button
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#FAC54D] px-6 text-sm font-bold text-gray-900 transition-all hover:-translate-y-0.5 hover:bg-[#e0b040] hover:shadow-md disabled:cursor-wait disabled:opacity-70"
+                  type="submit"
+                >
+                  <Search className="size-4" />
+                  Search
+                </button>
+              </form>
             </div>
+            {searchQuery && (
+              <div className="mb-4">
+                <a href={activeHref} className="text-sm font-bold text-[#FAC54D] hover:underline">
+                  Clear search for &quot;{searchQuery}&quot;
+                </a>
+              </div>
+            )}
             {recordsTable}
           </article>
 

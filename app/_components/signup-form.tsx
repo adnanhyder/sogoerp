@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LockKeyhole, Mail, User } from "lucide-react";
 import { LoadingSpinner } from "./loading-spinner";
+import { AlertModal } from "./alert-modal";
 
 export function SignupForm() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export function SignupForm() {
   const [password, setPassword] = useState("");
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [showAlert, setShowAlert] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -44,6 +46,7 @@ export function SignupForm() {
           ? "Supabase email rate limit exceeded. Turn off email confirmation in Supabase Auth settings, then try again."
           : errorMessage,
       );
+      setShowAlert(true);
       return;
     }
     
@@ -52,6 +55,7 @@ export function SignupForm() {
       JSON.stringify({ email, password }),
     );
     setSuccess("Account created. Taking you to login.");
+    setShowAlert(true);
     window.setTimeout(() => {
       router.push("/login?registered=1");
       router.refresh();
@@ -60,20 +64,14 @@ export function SignupForm() {
 
   return (
     <form className="mt-9 max-w-md space-y-4" onSubmit={handleSubmit}>
-      {error || success ? (
-        <div
-          aria-label={error || success}
-          className={`auth-phone-signal ${
-            error ? "auth-ios-alert-error" : "auth-ios-alert-success"
-          }`}
-        >
-          <span className="auth-ios-alert-light" />
-        </div>
-      ) : null}
-
-      {error || success ? (
-        <p className="auth-form-message">{error || success}</p>
-      ) : null}
+      <AlertModal
+        cancelText="Okay"
+        description={error || success}
+        isOpen={showAlert}
+        onClose={() => setShowAlert(false)}
+        title={error ? "Registration Failed" : success ? "Registration Successful" : "Notice"}
+        type={error ? "danger" : success ? "success" : "info"}
+      />
 
       <label className="block">
         <span className="mb-2 block text-sm font-semibold text-black">Full name</span>

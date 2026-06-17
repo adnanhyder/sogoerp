@@ -11,7 +11,7 @@ export async function DELETE(request: Request) {
   const moduleKey = body.moduleKey as CreateModuleKey;
   const config = createConfigs[moduleKey] as CreateConfig | undefined;
 
-  if (!config || !["inventory", "technicians"].includes(moduleKey)) {
+  if (!config || !["inventory", "technicians", "customers", "leads"].includes(moduleKey)) {
     return NextResponse.json({ error: "This ERP module cannot be deleted here." }, { status: 400 });
   }
 
@@ -45,6 +45,22 @@ export async function DELETE(request: Request) {
 
   if (lookupError) {
     return NextResponse.json({ error: lookupError.message }, { status: 400 });
+  }
+
+  if (moduleKey === "customers") {
+    // Unassign devices from this customer
+    await supabase
+      .from("devices")
+      .update({ custody_status: "company_hands", customer_id: null, status: "clear", vehicle_id: null })
+      .eq("customer_id", body.id);
+
+    // Delete dependent records
+    await Promise.all([
+      supabase.from("vehicles").delete().eq("customer_id", body.id),
+      supabase.from("work_orders").delete().eq("customer_id", body.id),
+      supabase.from("customer_meetings").delete().eq("customer_id", body.id),
+      supabase.from("insurance_policies").delete().eq("customer_id", body.id),
+    ]);
   }
 
   const { error } = await supabase.from(config.table).delete().eq("id", body.id);

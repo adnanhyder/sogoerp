@@ -1,5 +1,8 @@
 import { ModuleRoute } from "../_components/module-route";
 
-export default async function InsurancePage() {
-  return <ModuleRoute moduleKey="insurance" />;
+export default async function InsurancePage(props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const searchParams = await props.searchParams;
+  const q = typeof searchParams?.q === "string" ? searchParams.q : "";
+  return <ModuleRoute moduleKey="insurance" searchQuery={q} />;
 }
+
