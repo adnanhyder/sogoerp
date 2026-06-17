@@ -58,9 +58,9 @@ export async function PATCH(request: Request) {
       payload.technician_id = values.technician_id;
     }
 
-    if (payload.custody_status === "received_by_technician" && !payload.technician_id) {
+    if ((payload.custody_status === "received_by_technician" || payload.custody_status === "on_the_way") && !payload.technician_id) {
       return NextResponse.json(
-        { error: "Select which technician received this device." },
+        { error: "Select which technician received (or is receiving) this device." },
         { status: 400 },
       );
     }

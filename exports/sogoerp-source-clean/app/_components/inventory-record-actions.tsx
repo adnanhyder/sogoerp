@@ -83,7 +83,8 @@ export function InventoryRecordActions({
   async function saveRecord() {
     setError("");
 
-    if (draftCustody === "received_by_technician" && !draftTechnicianId) {
+    if ((draftCustody === "received_by_technician" || draftCustody === "on_the_way") && !draftTechnicianId) {
+      alert("Please select which technician received (or is receiving) this device.");
       setError("Please select which technician received this device.");
       return;
     }
@@ -249,7 +250,25 @@ export function InventoryRecordActions({
               Custody
               <select
                 className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] bg-white px-2 text-xs font-medium outline-none focus:border-black"
-                onChange={(event) => setDraftCustody(event.target.value)}
+                onChange={(event) => {
+                  const newCustody = event.target.value;
+                  setDraftCustody(newCustody);
+                  
+                  const custodyToStatusMap: Record<string, string> = {
+                    company_hands: "clear",
+                    on_the_way: "assigned",
+                    received_by_technician: "assigned",
+                    customer_hands: "installed",
+                    returned: "returned",
+                  };
+                  if (custodyToStatusMap[newCustody]) {
+                    setDraftStatus(custodyToStatusMap[newCustody]);
+                  }
+
+                  if (newCustody !== "received_by_technician" && newCustody !== "on_the_way") {
+                    setDraftTechnicianId("");
+                  }
+                }}
                 value={draftCustody}
               >
                 {custodyOptions.map((option) => (
@@ -264,10 +283,19 @@ export function InventoryRecordActions({
               <select
                 className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] bg-white px-2 text-xs font-medium outline-none focus:border-black"
                 onChange={(event) => {
-                  setDraftTechnicianId(event.target.value);
+                  const newTechId = event.target.value;
+                  setDraftTechnicianId(newTechId);
 
-                  if (event.target.value) {
-                    setDraftCustody("received_by_technician");
+                  if (newTechId) {
+                    if (draftCustody !== "on_the_way") {
+                      setDraftCustody("received_by_technician");
+                      setDraftStatus("assigned");
+                    }
+                  } else {
+                    if (draftCustody === "received_by_technician" || draftCustody === "on_the_way") {
+                      setDraftCustody("company_hands");
+                      setDraftStatus("clear");
+                    }
                   }
                 }}
                 value={draftTechnicianId}
