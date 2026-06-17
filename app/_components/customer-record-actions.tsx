@@ -4,6 +4,7 @@ import { CalendarClock, CheckCircle2, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LoadingSpinner } from "./loading-spinner";
+import { DateTimePicker } from "./date-time-picker";
 
 type TechnicianOption = {
   active: boolean;
@@ -133,10 +134,9 @@ export function CustomerRecordActions({ customerId, location, name }: CustomerRe
             </label>
             <label className="text-xs font-bold text-black">
               Meeting Date & Time
-              <input
-                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-medium outline-none focus:border-black"
-                onChange={(event) => setScheduledAt(event.target.value)}
-                type="datetime-local"
+              <DateTimePicker
+                className="mt-1 h-9 text-xs"
+                onChange={setScheduledAt}
                 value={scheduledAt}
               />
             </label>

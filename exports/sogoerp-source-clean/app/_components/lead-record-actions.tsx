@@ -4,6 +4,7 @@ import { CalendarClock, Pencil, Trophy, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LoadingSpinner } from "./loading-spinner";
+import { DateTimePicker } from "./date-time-picker";
 
 type LeadRecordActionsProps = {
   budget: string;
@@ -211,7 +212,11 @@ export function LeadRecordActions({
             </label>
             <label className="text-xs font-bold text-black">
               Next Follow-up Date & Time
-              <input className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-medium outline-none focus:border-black" onChange={(event) => setDraftFollowUpAt(event.target.value)} type="datetime-local" value={draftFollowUpAt} />
+              <DateTimePicker
+                className="mt-1 h-9 text-xs"
+                onChange={setDraftFollowUpAt}
+                value={draftFollowUpAt}
+              />
             </label>
             <button
               className="inline-flex h-9 items-center justify-center gap-2 rounded-[6px] bg-black px-3 text-xs font-bold text-white disabled:cursor-wait disabled:bg-[#343434]"

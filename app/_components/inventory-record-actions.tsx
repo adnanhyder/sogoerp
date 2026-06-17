@@ -4,6 +4,7 @@ import { CheckCircle2, Pencil, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LoadingSpinner } from "./loading-spinner";
+import { DateTimePicker } from "./date-time-picker";
 
 type InventoryRecordActionsProps = {
   custodyStatus: string;
@@ -344,10 +345,9 @@ export function InventoryRecordActions({
             </label>
             <label className="text-xs font-bold text-black">
               Success Date & Time
-              <input
-                className="mt-1 h-9 w-full rounded-[6px] border border-[#d2d2d2] px-2 text-xs font-medium outline-none focus:border-black"
-                onChange={(event) => setInstallCompletedAt(event.target.value)}
-                type="datetime-local"
+              <DateTimePicker
+                className="mt-1 h-9 text-xs"
+                onChange={setInstallCompletedAt}
                 value={installCompletedAt}
               />
             </label>

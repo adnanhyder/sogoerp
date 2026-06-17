@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CreateConfig } from "@/lib/create-config";
 import { LoadingSpinner } from "./loading-spinner";
+import { DateTimePicker } from "./date-time-picker";
 
 type CreateRecordFormProps = {
   config: CreateConfig;
@@ -172,6 +173,12 @@ export function CreateRecordForm({ config }: CreateRecordFormProps) {
               <input className="size-4 accent-black" name={field.name} type="checkbox" />
               Yes
             </span>
+          ) : field.type === "datetime-local" ? (
+            <DateTimePicker
+              className="h-11 text-sm"
+              name={field.name}
+              required={field.required}
+            />
           ) : (
             <input
               className="h-11 w-full rounded-[6px] border border-[#d2d2d2] bg-white px-3 text-sm text-black outline-none placeholder:text-[#999999] focus:border-black"
