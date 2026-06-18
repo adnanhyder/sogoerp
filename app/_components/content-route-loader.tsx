@@ -68,12 +68,7 @@ export function ContentRouteLoader({ children }: ContentRouteLoaderProps) {
     <div className="relative min-h-full">
       {children}
       {loading ? (
-        <div className="absolute inset-0 z-20 grid min-h-[260px] place-items-center rounded-[8px] bg-[#fbfbfb]/82 backdrop-blur-[2px]">
-          <div className="flex items-center gap-3 rounded-[8px] border border-[#d2d2d2] bg-white px-5 py-4 text-sm font-bold text-black shadow-[0_18px_45px_rgba(0,0,0,0.12)]">
-            <LoadingSpinner className="size-5" />
-            Loading page
-          </div>
-        </div>
+        <div className="sleek-loading-bar" />
       ) : null}
     </div>
   );

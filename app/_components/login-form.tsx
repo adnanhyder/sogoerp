@@ -1,8 +1,9 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { LoadingSpinner } from "./loading-spinner";
@@ -66,6 +67,31 @@ export function LoginForm({ initialEmail = "", notice = "" }: LoginFormProps) {
   const [showAlert, setShowAlert] = useState(false);
   const [hideNotice, setHideNotice] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const signalLight = () => {
+    if (!mounted || typeof window === "undefined") return null;
+    const phoneContainer = document.querySelector(".auth-phone");
+    if (!phoneContainer) return null;
+
+    let alertClass = "";
+    if (error) alertClass = "auth-ios-alert-error";
+    else if (success) alertClass = "auth-ios-alert-success";
+    else if (notice && !hideNotice) alertClass = "auth-ios-alert-info";
+
+    if (!alertClass) return null;
+
+    return createPortal(
+      <div className={`auth-phone-signal ${alertClass}`} key={alertClass}>
+        <div className="auth-ios-alert-light" />
+      </div>,
+      phoneContainer
+    );
+  };
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -108,21 +134,7 @@ export function LoginForm({ initialEmail = "", notice = "" }: LoginFormProps) {
 
   return (
     <form className="mt-9 max-w-md space-y-4" onSubmit={handleSubmit}>
-      {error && (
-        <div className="fixed left-0 right-0 top-0 z-50 flex justify-center bg-red-500 p-3 text-center text-white shadow-md animate-in slide-in-from-top-2">
-          <p className="text-sm font-bold">{error}</p>
-        </div>
-      )}
-      {success && (
-        <div className="fixed left-0 right-0 top-0 z-50 flex justify-center bg-green-500 p-3 text-center text-white shadow-md animate-in slide-in-from-top-2">
-          <p className="text-sm font-bold">{success}</p>
-        </div>
-      )}
-      {notice && !hideNotice && !error && !success && (
-        <div className="fixed left-0 right-0 top-0 z-50 flex justify-center bg-blue-500 p-3 text-center text-white shadow-md animate-in slide-in-from-top-2">
-          <p className="text-sm font-bold">{notice}</p>
-        </div>
-      )}
+      {signalLight()}
 
       <AlertModal
         cancelText="Okay"

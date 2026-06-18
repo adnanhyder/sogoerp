@@ -219,7 +219,15 @@ export async function POST(request: Request) {
   });
 
   if (customer?.source_lead_id) {
-    await supabase.from("leads").update({ stage: "won" }).eq("id", customer.source_lead_id);
+    await supabase.from("leads").update({ stage: "installed" }).eq("id", customer.source_lead_id);
+    
+    // Dismiss all pending follow-up notifications for this lead
+    await supabase
+      .from("lead_follow_ups")
+      .update({ seen: true })
+      .eq("lead_id", customer.source_lead_id)
+      .eq("seen", false);
+
     await supabase.from("activity_events").insert({
       created_by: context.userId,
       event_type: "updated",

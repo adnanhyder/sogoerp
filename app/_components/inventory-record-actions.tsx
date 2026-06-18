@@ -15,6 +15,8 @@ type InventoryRecordActionsProps = {
   purchaseCost: string;
   status: string;
   technicianId: string;
+  consignmentNumber?: string;
+  courierCompany?: string;
 };
 
 type TechnicianOption = {
@@ -35,6 +37,8 @@ export function InventoryRecordActions({
   purchaseCost,
   status,
   technicianId,
+  consignmentNumber = "",
+  courierCompany = "",
 }: InventoryRecordActionsProps) {
   const router = useRouter();
   const [error, setError] = useState("");
@@ -50,6 +54,8 @@ export function InventoryRecordActions({
   const [draftHasMic, setDraftHasMic] = useState(hasMic);
   const [draftPurchaseCost, setDraftPurchaseCost] = useState(purchaseCost);
   const [draftTechnicianId, setDraftTechnicianId] = useState(technicianId || "");
+  const [draftConsignmentNumber, setDraftConsignmentNumber] = useState(consignmentNumber);
+  const [draftCourierCompany, setDraftCourierCompany] = useState(courierCompany);
 
   useEffect(() => {
     let ignore = false;
@@ -77,8 +83,12 @@ export function InventoryRecordActions({
     setError("");
 
     if ((draftCustody === "received_by_technician" || draftCustody === "on_the_way") && !draftTechnicianId) {
-      alert("Please select which technician received (or is receiving) this device.");
       setError("Please select which technician received this device.");
+      return;
+    }
+
+    if (draftCustody === "on_the_way" && (!draftConsignmentNumber.trim() || !draftCourierCompany.trim())) {
+      setError("Please specify consignment number and courier company.");
       return;
     }
 
@@ -95,6 +105,8 @@ export function InventoryRecordActions({
           purchase_cost: draftPurchaseCost,
           status: draftStatus,
           technician_id: draftTechnicianId,
+          consignment_number: draftCustody === "on_the_way" ? draftConsignmentNumber || null : null,
+          courier_company: draftCustody === "on_the_way" ? draftCourierCompany || null : null,
         },
       }),
       headers: { "Content-Type": "application/json" },
@@ -244,15 +256,11 @@ export function InventoryRecordActions({
                     setDraftTechnicianId(newTechId);
   
                     if (newTechId) {
-                      if (draftCustody !== "on_the_way") {
-                        setDraftCustody("received_by_technician");
-                        setDraftStatus("assigned");
-                      }
+                      setDraftCustody("on_the_way");
+                      setDraftStatus("assigned");
                     } else {
-                      if (draftCustody === "received_by_technician" || draftCustody === "on_the_way") {
-                        setDraftCustody("company_hands");
-                        setDraftStatus("clear");
-                      }
+                      setDraftCustody("company_hands");
+                      setDraftStatus("clear");
                     }
                   }}
                   value={draftTechnicianId}
@@ -271,6 +279,29 @@ export function InventoryRecordActions({
                   </span>
                 ) : null}
               </label>
+
+              {draftCustody === "on_the_way" && (
+                <>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Courier Company</span>
+                    <input
+                      className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                      onChange={(event) => setDraftCourierCompany(event.target.value)}
+                      placeholder="e.g. TCS, Leopard"
+                      value={draftCourierCompany}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Consignment Number</span>
+                    <input
+                      className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                      onChange={(event) => setDraftConsignmentNumber(event.target.value)}
+                      placeholder="Consignment No..."
+                      value={draftConsignmentNumber}
+                    />
+                  </label>
+                </>
+              )}
               
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Purchase Cost</span>
@@ -293,6 +324,12 @@ export function InventoryRecordActions({
                 With Mic
               </label>
             </div>
+            
+            {error && (
+              <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700">
+                ⚠️ {error}
+              </div>
+            )}
             
             <div className="mt-8 flex justify-end gap-3 border-t border-gray-100 pt-6">
               <button

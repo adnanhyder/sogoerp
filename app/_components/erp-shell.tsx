@@ -65,22 +65,70 @@ export function ErpShell({
                 const Icon = item.icon;
                 const active = item.href === activeHref;
 
+                const isInventoryReportActive =
+                  activeHref.startsWith("/inventory/") &&
+                  ["/inventory/in-stock", "/inventory/on-way", "/inventory/received"].includes(activeHref);
+
                 return (
-                  <Link
-                    className={`relative flex min-h-12 items-center gap-4 px-8 py-3 text-sm transition ${
-                      active
-                        ? "bg-black font-semibold text-white"
-                        : "text-[#777777] hover:bg-[#fbfbfb] hover:text-black"
-                    }`}
-                    href={item.href}
-                    key={item.href}
-                  >
-                    {active ? (
-                      <span className="absolute left-2 h-8 w-1 rounded-full bg-white" />
-                    ) : null}
-                    <Icon className="size-[19px] shrink-0" strokeWidth={1.8} />
-                    <span>{item.title}</span>
-                  </Link>
+                  <div key={item.href} className="flex flex-col">
+                    <Link
+                      className={`relative flex min-h-12 items-center gap-4 px-8 py-3 text-sm transition ${
+                        active
+                          ? "bg-black font-semibold text-white"
+                          : "text-[#777777] hover:bg-[#fbfbfb] hover:text-black"
+                      }`}
+                      href={item.href}
+                    >
+                      {active ? (
+                        <span className="absolute left-2.5 h-6 w-1 rounded-full bg-white" />
+                      ) : null}
+                      <Icon className="size-[19px] shrink-0" strokeWidth={1.8} />
+                      <span>{item.title}</span>
+                    </Link>
+
+                    {item.href === "/inventory" && (
+                      <div className="flex flex-col">
+                        <Link
+                          className={`relative flex min-h-12 items-center gap-4 px-8 py-3 text-sm transition ${
+                            isInventoryReportActive
+                              ? "bg-black font-semibold text-white"
+                              : "text-[#777777] hover:bg-[#fbfbfb] hover:text-black"
+                          }`}
+                          href="/inventory/in-stock"
+                        >
+                          {isInventoryReportActive ? (
+                            <span className="absolute left-2.5 h-6 w-1 rounded-full bg-white" />
+                          ) : null}
+                          <Icon className="size-[19px] shrink-0" strokeWidth={1.8} />
+                          <span>Inventory Reports</span>
+                        </Link>
+                        {isInventoryReportActive && (
+                          <div className="flex flex-col border-l border-[#d2d2d2] ml-10 my-1 pl-3 gap-1.5">
+                            {[
+                              { title: "-- Inventory In Stock", href: "/inventory/in-stock" },
+                              { title: "-- Inventory On Way", href: "/inventory/on-way" },
+                              { title: "-- Inventory Received", href: "/inventory/received" },
+                            ].map((sub) => {
+                              const subActive = activeHref === sub.href;
+                              return (
+                                <Link
+                                  key={sub.href}
+                                  href={sub.href}
+                                  className={`text-xs py-1 transition ${
+                                    subActive
+                                      ? "text-black font-semibold"
+                                      : "text-[#777777] hover:text-black"
+                                  }`}
+                                >
+                                  {sub.title}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

@@ -74,7 +74,8 @@ export function LeadRecordActions({
   // Assignment States
   const [draftTechnicianId, setDraftTechnicianId] = useState(assignedTechnicianId || "");
   const [draftDeviceId, setDraftDeviceId] = useState(assignedDeviceId || "");
-  const [draftCustodyStatus, setDraftCustodyStatus] = useState("technician_hands");
+  const [draftConsignmentNumber, setDraftConsignmentNumber] = useState("");
+  const [draftCourierCompany, setDraftCourierCompany] = useState("");
   const [isSavingAssignment, setIsSavingAssignment] = useState(false);
   const [devices, setDevices] = useState<{ id: string; imei: string; technicianName: string; technician_id: string | null }[]>([]);
   const [technicians, setTechnicians] = useState<{ id: string; name: string; cities: string; deviceCount?: number }[]>([]);
@@ -277,7 +278,9 @@ export function LeadRecordActions({
           whatsapp: draftWhatsapp,
           assigned_technician_id: draftTechnicianId || null,
           assigned_device_id: draftDeviceId || null,
-          assigned_device_custody_status: draftCustodyStatus,
+          assigned_device_custody_status: draftDeviceId ? "on_the_way" : null,
+          consignment_number: draftDeviceId ? draftConsignmentNumber || null : null,
+          courier_company: draftDeviceId ? draftCourierCompany || null : null,
         },
       }),
       headers: { "Content-Type": "application/json" },
@@ -297,6 +300,11 @@ export function LeadRecordActions({
   }
 
   async function saveAssignment() {
+    if (draftDeviceId && (!draftConsignmentNumber.trim() || !draftCourierCompany.trim())) {
+      setError("Please specify consignment number and courier company for device delivery.");
+      return;
+    }
+
     setError("");
     setIsSavingAssignment(true);
 
@@ -307,7 +315,9 @@ export function LeadRecordActions({
         values: {
           assigned_technician_id: draftTechnicianId || null,
           assigned_device_id: draftDeviceId || null,
-          assigned_device_custody_status: draftCustodyStatus,
+          assigned_device_custody_status: draftDeviceId ? "on_the_way" : null,
+          consignment_number: draftDeviceId ? draftConsignmentNumber || null : null,
+          courier_company: draftDeviceId ? draftCourierCompany || null : null,
         },
       }),
       headers: { "Content-Type": "application/json" },
@@ -505,6 +515,39 @@ export function LeadRecordActions({
             </select>
           </label>
 
+          {draftDeviceId && (() => {
+            const selectedDevice = devices.find((d) => d.id === draftDeviceId);
+            if (!selectedDevice || !selectedDevice.technician_id) {
+              return (
+                <div className="grid gap-4 sm:grid-cols-2 bg-gray-50 p-4 rounded-[12px] border border-gray-150">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-bold text-gray-700">Courier Company *</span>
+                    <input
+                      className="h-9 rounded-[6px] border border-[#d2d2d2] bg-white px-3 text-sm font-semibold text-black outline-none transition focus:border-black"
+                      onChange={(event) => setDraftCourierCompany(event.target.value)}
+                      required
+                      type="text"
+                      placeholder="e.g. TCS, Leopard"
+                      value={draftCourierCompany}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-bold text-gray-700">Consignment Number *</span>
+                    <input
+                      className="h-9 rounded-[6px] border border-[#d2d2d2] bg-white px-3 text-sm font-semibold text-black outline-none transition focus:border-black"
+                      onChange={(event) => setDraftConsignmentNumber(event.target.value)}
+                      required
+                      type="text"
+                      placeholder="Tracking number"
+                      value={draftConsignmentNumber}
+                    />
+                  </label>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           <div className="mt-4 flex items-center justify-end gap-3 border-t border-[#ebebeb] pt-4">
             <button
               className="h-9 rounded-[6px] px-4 text-xs font-bold text-[#777777] transition hover:text-black"
@@ -689,17 +732,26 @@ export function LeadRecordActions({
                       const selectedDevice = devices.find((d) => d.id === draftDeviceId);
                       if (selectedDevice && !selectedDevice.technician_id) {
                         return (
-                          <label className="block sm:col-span-2">
-                            <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Device Custody Status</span>
-                            <select
-                              className="h-12 w-full appearance-none rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                              onChange={(event) => setDraftCustodyStatus(event.target.value)}
-                              value={draftCustodyStatus}
-                            >
-                              <option value="technician_hands">Received by Technician</option>
-                              <option value="on_the_way">On the Way</option>
-                            </select>
-                          </label>
+                          <>
+                            <label className="block">
+                              <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Courier Company *</span>
+                              <input
+                                className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D]"
+                                onChange={(event) => setDraftCourierCompany(event.target.value)}
+                                value={draftCourierCompany}
+                                placeholder="e.g. TCS, Leopard..."
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Consignment Number *</span>
+                              <input
+                                className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D]"
+                                onChange={(event) => setDraftConsignmentNumber(event.target.value)}
+                                value={draftConsignmentNumber}
+                                placeholder="Tracking ID"
+                              />
+                            </label>
+                          </>
                         );
                       }
                       return null;

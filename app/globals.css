@@ -309,11 +309,35 @@ a {
     0 0 34px rgba(48, 209, 88, 0.75);
 }
 
+.auth-ios-alert-info {
+  --auth-signal-color: #007aff;
+}
+
+.auth-ios-alert-info .auth-ios-alert-light {
+  background: #007aff;
+  box-shadow:
+    0 0 0 4px rgba(0, 122, 255, 0.18),
+    0 0 18px #007aff,
+    0 0 34px rgba(0, 122, 255, 0.75);
+}
+
+@keyframes ios-signal-blink {
+  0%, 100% {
+    opacity: 0.45;
+    filter: brightness(0.9);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.2) drop-shadow(0 0 4px var(--auth-signal-color));
+  }
+}
+
 .auth-ios-alert-light {
   width: 10px;
   height: 10px;
   flex: 0 0 auto;
   border-radius: 999px;
+  animation: ios-signal-blink 1.2s infinite ease-in-out;
 }
 
 .auth-phone-signal {
@@ -340,6 +364,12 @@ a {
 }
 
 .auth-phone-signal.auth-ios-alert-success {
+	position: absolute !important;
+	left: 163px !important;
+	top: 30px !important;
+}
+
+.auth-phone-signal.auth-ios-alert-info {
 	position: absolute !important;
 	left: 163px !important;
 	top: 30px !important;
@@ -443,4 +473,32 @@ a {
 .animate-marker-blink {
   animation: marker-blink 1.2s infinite ease-in-out;
 }
+
+/* Sleek Top Loading Progress Bar */
+@keyframes loading-progress-bar {
+  0% {
+    width: 0%;
+    left: 0%;
+  }
+  50% {
+    width: 70%;
+    left: 15%;
+  }
+  100% {
+    width: 100%;
+    left: 100%;
+  }
+}
+
+.sleek-loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #FAC54D 0%, #ffdf8d 50%, #FAC54D 100%);
+  box-shadow: 0 0 10px rgba(250, 197, 77, 0.7), 0 0 5px rgba(250, 197, 77, 0.4);
+  z-index: 100000;
+  animation: loading-progress-bar 1.2s infinite ease-in-out;
+}
+
 

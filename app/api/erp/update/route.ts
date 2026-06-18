@@ -81,6 +81,15 @@ export async function PATCH(request: Request) {
     if ("assigned_device_id" in values) {
       payload.assigned_device_id = values.assigned_device_id ?? null;
     }
+    if ("assigned_device_custody_status" in values) {
+      payload.assigned_device_custody_status = values.assigned_device_custody_status;
+    }
+    if ("consignment_number" in values) {
+      payload.consignment_number = values.consignment_number;
+    }
+    if ("courier_company" in values) {
+      payload.courier_company = values.courier_company;
+    }
   }
 
   const supabase = await createClient();
@@ -115,12 +124,14 @@ export async function PATCH(request: Request) {
       .single();
 
     if (device && !device.technician_id) {
-      // It's office stock, assign it to the technician first!
+      // It's office stock, assign it to the technician as on the way with tracking details!
       const { error: deviceUpdateError } = await supabase
         .from("devices")
         .update({
           technician_id: payload.assigned_technician_id,
-          custody_status: payload.assigned_device_custody_status || "technician_hands",
+          custody_status: "on_the_way",
+          consignment_number: payload.consignment_number || null,
+          courier_company: payload.courier_company || null,
         })
         .eq("id", payload.assigned_device_id);
 
@@ -130,9 +141,15 @@ export async function PATCH(request: Request) {
     }
   }
 
-  // Remove the custody status from payload before updating the leads table
+  // Remove the shipment tracking details from payload before updating the leads table
   if (payload.assigned_device_custody_status !== undefined) {
     delete payload.assigned_device_custody_status;
+  }
+  if (payload.consignment_number !== undefined) {
+    delete payload.consignment_number;
+  }
+  if (payload.courier_company !== undefined) {
+    delete payload.courier_company;
   }
 
   const { error } = await supabase.from(config.table).update(payload).eq("id", body.id);
@@ -149,83 +166,101 @@ export async function PATCH(request: Request) {
     record_label: String(payload.imei ?? payload.name ?? payload.full_name ?? payload.status ?? "Record"),
   });
 
-  // Auto-promotion logic for leads
-  if (moduleKey === "leads") {
-    const { data: updatedLead, error: leadFetchError } = await supabase
+  // Run promotion logic if a device custody status becomes received_by_technician
+  if (moduleKey === "inventory" && payload.custody_status === "received_by_technician") {
+    const { data: associatedLead } = await supabase
       .from("leads")
-      .select("id, name, phone, whatsapp, location, vehicle_type, budget, assigned_technician_id, assigned_device_id")
-      .eq("id", body.id)
-      .single();
+      .select("id")
+      .eq("assigned_device_id", body.id)
+      .limit(1)
+      .maybeSingle();
 
-    if (!leadFetchError && updatedLead?.assigned_technician_id && updatedLead?.assigned_device_id) {
-      const { data: existingCustomer } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("source_lead_id", updatedLead.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (!existingCustomer) {
-        const { data: newCustomer, error: customerError } = await supabase
-          .from("customers")
-          .insert({
-            area: updatedLead.location,
-            budget: updatedLead.budget,
-            full_name: updatedLead.name,
-            location: updatedLead.location,
-            ...organizationPayload(context),
-            phone: updatedLead.phone,
-            source_lead_id: updatedLead.id,
-            vehicle_type: updatedLead.vehicle_type,
-            whatsapp: updatedLead.whatsapp,
-          })
-          .select("id")
-          .single();
-
-        if (!customerError && newCustomer) {
-          const { data: newVehicle } = await supabase
-            .from("vehicles")
-            .insert({
-              customer_id: newCustomer.id,
-              ...organizationPayload(context),
-              vehicle_type: updatedLead.vehicle_type,
-            })
-            .select("id")
-            .single();
-
-          await supabase.from("work_orders").insert({
-            customer_id: newCustomer.id,
-            lead_id: updatedLead.id,
-            ...organizationPayload(context),
-            status: "assigned",
-            vehicle_id: newVehicle?.id ?? null,
-            device_id: updatedLead.assigned_device_id,
-            technician_id: updatedLead.assigned_technician_id,
-          });
-
-          await supabase.from("devices").update({
-            technician_id: updatedLead.assigned_technician_id,
-            customer_id: newCustomer.id,
-            custody_status: "received_by_technician",
-            status: "assigned",
-            vehicle_id: newVehicle?.id ?? null,
-          }).eq("id", updatedLead.assigned_device_id);
-
-          await supabase.from("leads").update({
-            stage: "installation_scheduled"
-          }).eq("id", updatedLead.id);
-
-          await supabase.from("activity_events").insert({
-            created_by: context.userId,
-            event_type: "created",
-            module_key: "customers",
-            record_id: newCustomer.id,
-            record_label: `Auto-promoted from Lead: ${updatedLead.name}`,
-          });
-        }
-      }
+    if (associatedLead) {
+      await promoteLeadToCustomer(supabase, associatedLead.id, context);
     }
   }
 
   return NextResponse.json({ ok: true });
 }
+
+async function promoteLeadToCustomer(supabase: any, leadId: string, context: any) {
+  const { data: lead, error: leadFetchError } = await supabase
+    .from("leads")
+    .select("id, name, phone, whatsapp, location, vehicle_type, budget, assigned_technician_id, assigned_device_id")
+    .eq("id", leadId)
+    .single();
+
+  if (leadFetchError || !lead || !lead.assigned_technician_id || !lead.assigned_device_id) {
+    return;
+  }
+
+  const { data: existingCustomer } = await supabase
+    .from("customers")
+    .select("id")
+    .eq("source_lead_id", lead.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (!existingCustomer) {
+    const { data: newCustomer, error: customerError } = await supabase
+      .from("customers")
+      .insert({
+        area: lead.location,
+        budget: lead.budget,
+        full_name: lead.name,
+        location: lead.location,
+        organization_id: context.organizationId,
+        phone: lead.phone,
+        source_lead_id: lead.id,
+        vehicle_type: lead.vehicle_type,
+        whatsapp: lead.whatsapp,
+      })
+      .select("id")
+      .single();
+
+    if (!customerError && newCustomer) {
+      const { data: newVehicle } = await supabase
+        .from("vehicles")
+        .insert({
+          customer_id: newCustomer.id,
+          organization_id: context.organizationId,
+          vehicle_type: lead.vehicle_type,
+        })
+        .select("id")
+        .single();
+
+      await supabase.from("work_orders").insert({
+        customer_id: newCustomer.id,
+        lead_id: lead.id,
+        organization_id: context.organizationId,
+        status: "assigned",
+        vehicle_id: newVehicle?.id ?? null,
+        device_id: lead.assigned_device_id,
+        technician_id: lead.assigned_technician_id,
+      });
+
+      await supabase.from("devices").update({
+        technician_id: lead.assigned_technician_id,
+        customer_id: newCustomer.id,
+        custody_status: "received_by_technician",
+        status: "assigned",
+        vehicle_id: newVehicle?.id ?? null,
+        consignment_number: null,
+        courier_company: null,
+      }).eq("id", lead.assigned_device_id);
+
+      await supabase.from("leads").update({
+        stage: "installation_scheduled"
+      }).eq("id", lead.id);
+
+      await supabase.from("activity_events").insert({
+        created_by: context.userId,
+        event_type: "created",
+        module_key: "customers",
+        record_id: newCustomer.id,
+        record_label: `Auto-promoted from Lead: ${lead.name}`,
+      });
+    }
+  }
+}
+

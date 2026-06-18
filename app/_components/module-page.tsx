@@ -168,7 +168,7 @@ export function ModulePage({
           {mainTableRows.length ? (
             mainTableRows.map((row) => {
               const visibleCells = isInventory
-                ? row.slice(4)
+                ? row.slice(4, 14)
                 : isTechnicians
                   ? [row[6] ?? "", row[8] ?? "", row[9] ?? "", row[10] ?? "", row[11] ?? "", row[14] ?? "", row[15] ?? ""]
                   : isLeads
@@ -214,6 +214,8 @@ export function ModulePage({
                         purchaseCost={inventoryPurchaseCost}
                         status={inventoryStatus}
                         technicianId={inventoryTechnicianId}
+                        consignmentNumber={row[19] ?? ""}
+                        courierCompany={row[20] ?? ""}
                       />
                     </td>
                   ) : null}

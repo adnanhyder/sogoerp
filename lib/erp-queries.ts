@@ -153,7 +153,6 @@ export async function getDashboardData(
       { label: "Active Devices", value: "0", detail: "0 total devices" },
       { label: "Monthly Sales", value: "$0", detail: "$0 expenses" },
       { label: "Pending Installs", value: "0", detail: "0 work orders total" },
-      { label: "Open Tickets", value: "0", detail: "0 support tickets total" },
     ],
     moduleSnapshots: [
       {
@@ -209,74 +208,103 @@ export async function getDashboardData(
     const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
 
     const [
-      activeDevices,
-      totalDevices,
-      totalVehicles,
-      pendingInstalls,
-      totalWorkOrders,
-      openTickets,
-      totalTickets,
-      monthlyIncome,
-      monthlyExpenses,
-      totalCommissions,
-      purchasedDevices,
-      approvedDevices,
-      techDevices,
-      installedDevices,
-      assignedToday,
-      completedToday,
-      awaitingProof,
-      totalLeads,
+      devicesRes,
+      workOrdersRes,
+      supportTicketsRes,
+      leadsRes,
+      vehiclesRes,
+      financeRes,
+      commissionsRes,
     ] = await Promise.all([
-      countRows(supabase, "devices", (query) => query.eq("status", "active")),
-      countRows(supabase, "devices"),
-      countRows(supabase, "vehicles"),
-      countRows(supabase, "work_orders", (query) =>
-        query.in("status", ["assigned", "scheduled", "in_progress"]),
-      ),
-      countRows(supabase, "work_orders"),
-      countRows(supabase, "support_tickets", (query) =>
-        query.in("status", ["open", "in_progress"]),
-      ),
-      countRows(supabase, "support_tickets"),
-      sumFinance(supabase, "income", monthStart),
-      sumFinance(supabase, "expense", monthStart),
-      sumCommissions(supabase, monthStart),
-      countRows(supabase, "devices", (query) => query.eq("status", "purchased")),
-      countRows(supabase, "devices", (query) => query.eq("status", "imei_approved")),
-      countRows(supabase, "devices", (query) => query.eq("custody_status", "received_by_technician")),
-      countRows(supabase, "devices", (query) =>
-        query.in("status", ["installed", "activated_with_sim", "active"]),
-      ),
-      countRows(supabase, "work_orders", (query) =>
-        query.gte("scheduled_at", todayStart).lt("scheduled_at", tomorrowStart),
-      ),
-      countRows(supabase, "work_orders", (query) =>
-        query.eq("status", "completed").gte("completed_at", todayStart).lt("completed_at", tomorrowStart),
-      ),
-      countRows(supabase, "work_orders", (query) =>
-        query.eq("status", "completed").or("before_image_url.is.null,after_image_url.is.null"),
-      ),
-      countRows(supabase, "leads"),
+      supabase.from("devices").select("status, custody_status, purchase_cost, installation_date"),
+      supabase.from("work_orders").select("id, status, scheduled_at, completed_at, before_image_url, after_image_url, created_at, customers(full_name), devices(imei)"),
+      supabase.from("support_tickets").select("status"),
+      supabase.from("leads").select("stage"),
+      supabase.from("vehicles").select("id", { count: "exact", head: true }),
+      supabase.from("finance_entries").select("amount, entry_type").gte("occurred_on", monthStart),
+      supabase.from("commissions").select("amount").gte("created_at", monthStart),
     ]);
 
-    const leadStages = await Promise.all([
-      countRows(supabase, "leads", (query) => query.eq("stage", "new_lead")),
-      countRows(supabase, "leads", (query) => query.eq("stage", "contacted")),
-      countRows(supabase, "leads", (query) => query.eq("stage", "negotiation")),
-      countRows(supabase, "leads", (query) => query.eq("stage", "installation_scheduled")),
-      countRows(supabase, "leads", (query) => query.eq("stage", "installed")),
-    ]);
+    const firstError = [
+      devicesRes.error,
+      workOrdersRes.error,
+      supportTicketsRes.error,
+      leadsRes.error,
+      vehiclesRes.error,
+      financeRes.error,
+      commissionsRes.error,
+    ].find(Boolean);
 
-    const { data: operationsData, error: operationsError } = await supabase
-      .from("work_orders")
-      .select("id,status,scheduled_at,created_at,customers(full_name),devices(imei)")
-      .order("created_at", { ascending: false })
-      .limit(8);
-
-    if (operationsError) {
-      throw operationsError;
+    if (firstError) {
+      throw firstError;
     }
+
+    const devices = devicesRes.data ?? [];
+    const workOrders = workOrdersRes.data ?? [];
+    const supportTickets = supportTicketsRes.data ?? [];
+    const leads = leadsRes.data ?? [];
+    const totalVehicles = vehiclesRes.count ?? 0;
+    const financeEntries = financeRes.data ?? [];
+    const commissions = commissionsRes.data ?? [];
+
+    const activeDevices = devices.filter((d) =>
+      ["installed", "activated_with_sim", "active"].includes(d.status ?? "")
+    ).length;
+    const totalDevices = devices.length;
+    const pendingInstalls = workOrders.filter((w) =>
+      ["assigned", "scheduled", "in_progress"].includes(w.status ?? "")
+    ).length;
+    const totalWorkOrders = workOrders.length;
+    const openTickets = supportTickets.filter((t) =>
+      ["open", "in_progress"].includes(t.status ?? "")
+    ).length;
+    const totalTickets = supportTickets.length;
+
+    const monthlyIncome = financeEntries
+      .filter((f) => f.entry_type === "income")
+      .reduce((sum, f) => sum + Number(f.amount ?? 0), 0);
+    const monthlyExpenses = financeEntries
+      .filter((f) => f.entry_type === "expense")
+      .reduce((sum, f) => sum + Number(f.amount ?? 0), 0);
+    const totalCommissions = commissions.reduce((sum, c) => sum + Number(c.amount ?? 0), 0);
+
+    const purchasedDevices = devices.filter((d) => d.status === "purchased").length;
+    const approvedDevices = devices.filter((d) => d.status === "imei_approved").length;
+    const techDevices = devices.filter((d) => d.custody_status === "received_by_technician").length;
+    const installedDevices = activeDevices;
+
+    const assignedToday = workOrders.filter((w) => {
+      const sched = w.scheduled_at;
+      return sched && sched >= todayStart && sched < tomorrowStart;
+    }).length;
+    const completedToday = workOrders.filter((w) => {
+      const comp = w.completed_at;
+      return w.status === "completed" && comp && comp >= todayStart && comp < tomorrowStart;
+    }).length;
+    const awaitingProof = workOrders.filter(
+      (w) => w.status === "completed" && (!w.before_image_url || !w.after_image_url)
+    ).length;
+
+    const totalLeads = leads.length;
+    const monthlyDevicePurchaseCost = devices
+      .filter((d) => {
+        const inst = d.installation_date;
+        return inst && inst >= monthStart;
+      })
+      .reduce((sum, d) => sum + Number(d.purchase_cost ?? 0), 0);
+    const monthlyTechnicianCommissions = totalCommissions;
+
+    const leadStages = [
+      leads.filter((l) => l.stage === "new_lead").length,
+      leads.filter((l) => l.stage === "contacted").length,
+      leads.filter((l) => l.stage === "negotiation").length,
+      leads.filter((l) => l.stage === "installation_scheduled").length,
+      leads.filter((l) => l.stage === "installed").length,
+    ];
+
+    const operationsData = [...workOrders]
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+      .slice(0, 8);
 
     const operations = ((operationsData ?? []) as Record<string, unknown>[]).map((operation) => ({
       amount: "-",
@@ -291,7 +319,8 @@ export async function getDashboardData(
       ? Math.round((completedToday / Math.max(assignedToday, 1)) * 100)
       : 0;
     const slaRisk = Math.max(0, assignedToday - completedToday);
-    const netProfit = monthlyIncome - monthlyExpenses - totalCommissions;
+    const totalExpenses = monthlyExpenses + monthlyDevicePurchaseCost + monthlyTechnicianCommissions;
+    const netProfit = monthlyIncome - totalExpenses;
 
     return {
       data: {
@@ -329,17 +358,12 @@ export async function getDashboardData(
           {
             label: "Monthly Sales",
             value: formatMoney(monthlyIncome),
-            detail: `${formatMoney(monthlyExpenses)} expenses`,
+            detail: `${formatMoney(totalExpenses)} expenses`,
           },
           {
             label: "Pending Installs",
             value: formatCount(pendingInstalls),
             detail: `${formatCount(totalWorkOrders)} work orders total`,
-          },
-          {
-            label: "Open Tickets",
-            value: formatCount(openTickets),
-            detail: `${formatCount(totalTickets)} support tickets total`,
           },
         ],
         moduleSnapshots: [
@@ -365,8 +389,8 @@ export async function getDashboardData(
             title: "Finance Pulse",
             rows: [
               ["Revenue", formatMoney(monthlyIncome)],
-              ["Expenses", formatMoney(monthlyExpenses)],
-              ["Pay Technicians", formatMoney(totalCommissions)],
+              ["Expenses", formatMoney(monthlyExpenses + monthlyDevicePurchaseCost)],
+              ["Pay Technicians", formatMoney(monthlyTechnicianCommissions)],
               ["Net Profit", formatMoney(netProfit)],
             ],
           },
@@ -407,6 +431,32 @@ async function sumCommissions(supabase: SupabaseClient, startDate?: string) {
   }
 
   const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).reduce((total, row) => total + Number(row.amount ?? 0), 0);
+}
+
+async function sumDevicePurchaseCosts(supabase: SupabaseClient, startDate: string) {
+  const { data, error } = await supabase
+    .from("devices")
+    .select("purchase_cost")
+    .gte("installation_date", startDate);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).reduce((total, row) => total + Number(row.purchase_cost ?? 0), 0);
+}
+
+async function sumAllCommissions(supabase: SupabaseClient, startDate: string) {
+  const { data, error } = await supabase
+    .from("commissions")
+    .select("amount")
+    .gte("created_at", startDate);
 
   if (error) {
     throw error;
@@ -567,7 +617,7 @@ function displayDeviceStatus(value: unknown) {
 async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
   let query = supabase
     .from("devices")
-    .select("id,imei,status,custody_status,has_mic,purchase_cost,sale_price,installation_date,created_at,technician_id,technicians(name,phone,cities),customer_id,customers(full_name,phone,location)")
+    .select("id,imei,status,custody_status,has_mic,purchase_cost,sale_price,installation_date,created_at,technician_id,technicians(name,phone,cities),customer_id,customers(full_name,phone,location),consignment_number,courier_company")
     .order("created_at", { ascending: false });
 
   const trimmedSearch = searchQuery.trim();
@@ -618,6 +668,8 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
       relatedField(row.customers, "location") ?? "-", // 16: customer city
       String(row.sale_price ?? "0"), // 17: sale price
       row.installation_date ? formatDate(String(row.installation_date)) : "-", // 18: installation date
+      String(row.consignment_number ?? ""), // 19
+      String(row.courier_company ?? ""), // 20
     ];
   });
 }

@@ -6,6 +6,7 @@ import {
   MapPinned,
 } from "lucide-react";
 import { ErpShell } from "../_components/erp-shell";
+import { FollowUpsBanner } from "../_components/follow-ups-banner";
 import { erpModules } from "@/lib/erp-data";
 import { getDashboardData } from "@/lib/erp-queries";
 import { requireUser } from "@/lib/auth";
@@ -91,10 +92,15 @@ export default async function DashboardPage() {
   const oneDayAhead = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const { data: followUpsData } = await supabase
     .from("lead_follow_ups")
-    .select("id,reason,next_follow_up_at,lead_id,leads(name)")
+    .select("id,reason,next_follow_up_at,lead_id,leads(name,stage)")
     .lte("next_follow_up_at", oneDayAhead)
     .eq("seen", false)
     .order("next_follow_up_at", { ascending: true });
+
+  const activeFollowUps = (followUpsData ?? []).filter((fu: any) => {
+    const stage = fu.leads?.stage;
+    return stage !== "won" && stage !== "installed";
+  });
 
   return (
     <ErpShell activeHref="/dashboard" title="Business Overview" user={user}>
@@ -105,59 +111,9 @@ export default async function DashboardPage() {
           </section>
         ) : null}
 
-        {followUpsData && followUpsData.length > 0 ? (
-          <section className="rounded-[16px] border-2 border-[#FAC54D] bg-[#FAC54D]/5 p-6 shadow-md animate-[slideUpFade_0.3s_ease-out_both]">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="relative flex h-3.5 w-3.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500"></span>
-              </span>
-              <h2 className="text-sm font-extrabold uppercase tracking-wider text-[#b58b29]">
-                Action Required: Upcoming Follow-ups ({followUpsData.length})
-              </h2>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {followUpsData.map((fu: any) => {
-                const leadName = fu.leads?.name ?? "Lead";
-                const timeLeft = new Date(fu.next_follow_up_at).getTime() - Date.now();
-                const hoursLeft = Math.round(timeLeft / (1000 * 60 * 60));
-                let timeText = "";
-                if (hoursLeft < 0) {
-                  timeText = "Overdue";
-                } else if (hoursLeft === 0) {
-                  timeText = "Due now";
-                } else {
-                  timeText = `Due in ${hoursLeft}h`;
-                }
+        <FollowUpsBanner followUps={activeFollowUps} />
 
-                return (
-                  <a
-                    key={fu.id}
-                    href={`/leads?q=${encodeURIComponent(leadName)}&openFollowUps=${fu.lead_id}`}
-                    className="flex flex-col justify-between rounded-[12px] border border-[#FAC54D]/30 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#FAC54D] hover:shadow-md"
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <span className="font-bold text-gray-900 text-sm">{leadName}</span>
-                        <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${hoursLeft < 0 ? 'bg-red-100 text-red-700' : 'bg-[#FAC54D]/20 text-gray-800'}`}>
-                          {timeText}
-                        </span>
-                      </div>
-                      <p className="text-xs font-semibold text-gray-600 line-clamp-2">
-                        Reason: {fu.reason}
-                      </p>
-                    </div>
-                    <div className="mt-3 text-[11px] font-bold text-[#b58b29] text-right">
-                      View details →
-                    </div>
-                  </a>
-                );
-              })}
-            </div>
-          </section>
-        ) : null}
-
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {kpis.map((card) => (
             <article
               className="rounded-[16px] border border-gray-100 bg-white p-6 shadow-sm ring-1 ring-gray-100/50 transition hover:shadow-md hover:scale-[1.01]"
