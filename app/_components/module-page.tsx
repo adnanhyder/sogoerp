@@ -7,6 +7,7 @@ import { CustomerRecordActions } from "./customer-record-actions";
 import { InventoryRecordActions } from "./inventory-record-actions";
 import { LeadRecordActions } from "./lead-record-actions";
 import { TechnicianRecordActions } from "./technician-record-actions";
+import { InstalledDevicesTable } from "./installed-devices-table";
 import type { CreateConfig } from "@/lib/create-config";
 
 type ModuleMetric = {
@@ -75,6 +76,10 @@ export function ModulePage({
   const isCustomers = activeHref === "/customers";
   const isTechnicians = activeHref === "/technicians";
   const isCoreAdmin = ["/inventory", "/leads", "/technicians", "/customers"].includes(activeHref);
+  
+  const mainTableRows = isInventory ? tableRows.filter(row => row[1] !== "installed") : tableRows;
+  const installedDevices = isInventory ? tableRows.filter(row => row[1] === "installed") : [];
+
   function renderInventoryCell(cell: string, index: number) {
     if (index === 0) {
       return <span className="font-bold tracking-[-0.01em] text-black">{cell}</span>;
@@ -151,16 +156,16 @@ export function ModulePage({
           </tr>
         </thead>
         <tbody>
-          {tableRows.length ? (
-            tableRows.map((row) => {
+          {mainTableRows.length ? (
+            mainTableRows.map((row) => {
               const visibleCells = isInventory
                 ? row.slice(4)
                 : isTechnicians
-                  ? [row[6] ?? "", row[8] ?? "", row[9] ?? "", row[10] ?? "", row[13] ?? "", row[14] ?? ""]
+                  ? [row[6] ?? "", row[8] ?? "", row[9] ?? "", row[10] ?? "", row[11] ?? "", row[14] ?? "", row[15] ?? ""]
                   : isLeads
                     ? [row[3] ?? "", row[4] ?? "", row[7] ?? "", row[8] ?? "", row[14] ? `👷 ${row[14]}` : "—", row[11] ?? "", row[12] ?? ""]
                     : isCustomers
-                      ? [row[1] ?? "", row[2] ?? "", row[7] ?? "", row[8] ?? "", row[11] ?? "", row[12] ?? "", row[13] ?? ""]
+                      ? [row[1] ?? "", row[2] ?? "", row[7] ?? "", row[8] ?? "", row[9] ? `Rs. ${row[9]}` : "-", row[11] ?? "", row[16] ?? "", row[12] ?? "", row[13] ?? ""]
                       : row;
               const inventoryId = row[0] ?? "";
               const inventoryStatus = row[1] ?? "";
@@ -426,6 +431,10 @@ export function ModulePage({
           </article>
         </section>
       </div>
+
+      {isInventory && installedDevices.length > 0 ? (
+        <InstalledDevicesTable columns={tableColumns} rows={installedDevices} />
+      ) : null}
     </ErpShell>
   );
 }

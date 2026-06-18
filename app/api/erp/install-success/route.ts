@@ -85,7 +85,13 @@ export async function POST(request: Request) {
     );
   }
 
-  // Fetch customer's primary vehicle if they have one
+  // Fetch customer's primary vehicle if they have one and the source lead
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("source_lead_id")
+    .eq("id", body.customerId)
+    .single();
+
   const { data: vehicle } = await supabase
     .from("vehicles")
     .select("id")
@@ -211,6 +217,17 @@ export async function POST(request: Request) {
     record_id: body.deviceId,
     record_label: `Installed ${device.imei ?? "device"} by ${technician.name ?? "technician"}`,
   });
+
+  if (customer?.source_lead_id) {
+    await supabase.from("leads").update({ stage: "won" }).eq("id", customer.source_lead_id);
+    await supabase.from("activity_events").insert({
+      created_by: context.userId,
+      event_type: "updated",
+      module_key: "leads",
+      record_id: customer.source_lead_id,
+      record_label: `Marked as won after installation of ${device.imei ?? "device"}`,
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

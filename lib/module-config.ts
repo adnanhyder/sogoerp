@@ -11,7 +11,7 @@ export const moduleConfigs = {
       { label: "In Transit", value: "38", detail: "Courier / technician handoff" },
       { label: "Faulty", value: "17", detail: "Pending replacement" },
     ],
-    tableColumns: ["IMEI", "Device Status", "Custody", "Mic", "Technician", "City", "Tech Devices", "Purchase Cost", "Added At", "Actions"],
+    tableColumns: ["IMEI", "Device Status", "Custody", "Mic", "Technician", "Target Customer", "City", "Tech Devices", "Purchase Cost", "Added At", "Actions"],
     tableRows: [
       ["865742091234567", "IMEI Approved", "Unassigned", "-", "-"],
       ["865742091234611", "With Technician", "Hamza Field", "-", "-"],
@@ -61,7 +61,7 @@ export const moduleConfigs = {
       { label: "Proof Pending", value: "08", detail: "Need images/signature" },
       { label: "Avg Install Time", value: "52m", detail: "Across this week" },
     ],
-    tableColumns: ["Technician", "City", "Phone", "Device Flow", "Status", "Created At", "Actions"],
+    tableColumns: ["Technician", "City", "Phone", "Assigned Tasks", "Device Flow", "Status", "Created At", "Actions"],
     tableRows: [
       ["Ali Raza", "Johar / Gulshan", "07", "$12/install", "Active"],
       ["Hamza Field", "Korangi", "05", "$10/install", "On route"],
@@ -85,7 +85,7 @@ export const moduleConfigs = {
       { label: "Renewals Due", value: "64", detail: "Next 30 days" },
       { label: "Open Tickets", value: "28", detail: "6 high priority" },
     ],
-    tableColumns: ["Customer", "Phone", "Location", "Vehicle", "Suggested Techs", "Follow-up Meeting", "Created At", "Actions"],
+    tableColumns: ["Customer", "Phone", "Location", "Vehicle", "Budget", "Suggested Techs", "Assigned Device", "Follow-up Meeting", "Created At", "Actions"],
     tableRows: [
       ["Metro Fleet", "0300-1111111", "42", "865742091234688", "Active"],
       ["Al Noor Logistics", "0312-2222222", "18", "Pending Install", "N/A"],

@@ -108,16 +108,32 @@ export function LoginForm({ initialEmail = "", notice = "" }: LoginFormProps) {
 
   return (
     <form className="mt-9 max-w-md space-y-4" onSubmit={handleSubmit}>
+      {error && (
+        <div className="fixed left-0 right-0 top-0 z-50 flex justify-center bg-red-500 p-3 text-center text-white shadow-md animate-in slide-in-from-top-2">
+          <p className="text-sm font-bold">{error}</p>
+        </div>
+      )}
+      {success && (
+        <div className="fixed left-0 right-0 top-0 z-50 flex justify-center bg-green-500 p-3 text-center text-white shadow-md animate-in slide-in-from-top-2">
+          <p className="text-sm font-bold">{success}</p>
+        </div>
+      )}
+      {notice && !hideNotice && !error && !success && (
+        <div className="fixed left-0 right-0 top-0 z-50 flex justify-center bg-blue-500 p-3 text-center text-white shadow-md animate-in slide-in-from-top-2">
+          <p className="text-sm font-bold">{notice}</p>
+        </div>
+      )}
+
       <AlertModal
         cancelText="Okay"
-        description={error || success || notice}
-        isOpen={showAlert || (!!notice && !hideNotice)}
+        description={error}
+        isOpen={showAlert && !!error}
         onClose={() => {
           setShowAlert(false);
           setHideNotice(true);
         }}
-        title={error ? "Login Failed" : success ? "Login Successful" : "Notice"}
-        type={error ? "danger" : success ? "success" : "info"}
+        title="Login Failed"
+        type="danger"
       />
 
       <label className="block">

@@ -72,7 +72,7 @@ export function LeadRecordActions({
 
   const [error, setError] = useState("");
   const [isSavingAssignment, setIsSavingAssignment] = useState(false);
-  const [technicians, setTechnicians] = useState<{ id: string; name: string; cities: string }[]>([]);
+  const [technicians, setTechnicians] = useState<{ id: string; name: string; cities: string; deviceCount?: number }[]>([]);
   const [devices, setDevices] = useState<{ id: string; imei: string; technicianName: string }[]>([]);
   const [draftTechnicianId, setDraftTechnicianId] = useState(assignedTechnicianId);
   const [draftDeviceId, setDraftDeviceId] = useState(assignedDeviceId || "");
@@ -114,7 +114,7 @@ export function LeadRecordActions({
     fetch("/api/erp/options/technicians")
       .then((r) => r.json())
       .then((payload) => {
-        const list = (payload.technicians ?? []) as { id: string; name: string; cities: string; active: boolean }[];
+        const list = (payload.technicians ?? []) as { id: string; name: string; cities: string; active: boolean; deviceCount: number }[];
         setTechnicians(list.filter((t) => t.active));
       })
       .catch(() => {});
@@ -268,6 +268,15 @@ export function LeadRecordActions({
 
   async function saveAssignment() {
     setError("");
+
+    if (draftTechnicianId) {
+      const selectedTech = technicians.find(t => t.id === draftTechnicianId);
+      if (selectedTech && (selectedTech.deviceCount === undefined || selectedTech.deviceCount === 0)) {
+        setError("This technician has no device in hand. First assign him a device and send him, then it will be added.");
+        return;
+      }
+    }
+    
     setIsSavingAssignment(true);
 
     const response = await fetch("/api/erp/update", {
@@ -567,57 +576,87 @@ export function LeadRecordActions({
             <div className="my-6 h-px bg-gray-100" />
 
             {/* Assignment Section */}
-            <div>
-              <h4 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider mb-4">
-                Assign Technician & Device
-              </h4>
-              <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
-                <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Assigned Technician</span>
-                  <select
-                    className="h-12 w-full appearance-none rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                    onChange={(event) => setDraftTechnicianId(event.target.value)}
-                    value={draftTechnicianId}
-                  >
-                    <option value="">-- Unassigned --</option>
-                    {technicians.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.cities})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Assign Device (IMEI)</span>
-                  <select
-                    className="h-12 w-full appearance-none rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                    onChange={(event) => setDraftDeviceId(event.target.value)}
-                    value={draftDeviceId}
-                  >
-                    <option value="">-- Unassigned --</option>
-                    {assignedDeviceId ? (
-                      <option value={assignedDeviceId}>{assignedDeviceImei} (Current)</option>
-                    ) : null}
-                    {devices.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.imei} {d.technicianName ? `(${d.technicianName})` : "(Unassigned)"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={saveAssignment}
-                  disabled={busy}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-[12px] bg-black px-8 text-sm font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#343434] hover:shadow-lg focus:ring-4 focus:ring-black/30 disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0"
-                  type="button"
-                >
-                  {isSavingAssignment ? <LoadingSpinner className="size-4" /> : null}
-                  {isSavingAssignment ? "Saving..." : "Save Assignment"}
-                </button>
-              </div>
-            </div>
+            {(() => {
+              const localTechnicians = technicians.filter(t => {
+                if (!t.cities || !location) return false;
+                const techCities = t.cities.toLowerCase().split(',').map(c => c.trim()).filter(Boolean);
+                const loc = location.toLowerCase();
+                return techCities.some(city => loc.includes(city) || city.includes(loc));
+              });
+              const otherTechnicians = technicians.filter(t => !localTechnicians.includes(t));
+              
+              return (
+                <div>
+                  <h4 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider mb-4">
+                    Assign Technician & Device
+                  </h4>
+                  <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
+                    <div className="block">
+                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Assigned Technician</span>
+                      <select
+                        className="h-12 w-full appearance-none rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                        onChange={(event) => setDraftTechnicianId(event.target.value)}
+                        value={draftTechnicianId}
+                      >
+                        <option value="">-- Unassigned --</option>
+                        {localTechnicians.length > 0 && (
+                          <optgroup label="📍 Local Technicians">
+                            {localTechnicians.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.name} ({t.deviceCount || 0} Devices)
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {otherTechnicians.length > 0 && (
+                          <optgroup label="🌍 Other Technicians">
+                            {otherTechnicians.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.name} ({t.deviceCount || 0} Devices)
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                      {localTechnicians.length === 0 && (
+                        <p className="mt-2 text-[11px] font-medium text-amber-600">
+                          ⚠️ There is no registered technician to the client's location.
+                        </p>
+                      )}
+                    </div>
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Assign Device (IMEI)</span>
+                      <select
+                        className="h-12 w-full appearance-none rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                        onChange={(event) => setDraftDeviceId(event.target.value)}
+                        value={draftDeviceId}
+                      >
+                        <option value="">-- Unassigned --</option>
+                        {assignedDeviceId ? (
+                          <option value={assignedDeviceId}>{assignedDeviceImei} (Current)</option>
+                        ) : null}
+                        {devices.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.imei} {d.technicianName ? `(${d.technicianName})` : "(Unassigned)"}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={saveAssignment}
+                      disabled={busy}
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-[12px] bg-black px-8 text-sm font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#343434] hover:shadow-lg focus:ring-4 focus:ring-black/30 disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0"
+                      type="button"
+                    >
+                      {isSavingAssignment ? <LoadingSpinner className="size-4" /> : null}
+                      {isSavingAssignment ? "Saving..." : "Save Assignment"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="my-6 h-px bg-gray-100" />
 

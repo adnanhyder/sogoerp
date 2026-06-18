@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LoadingSpinner } from "./loading-spinner";
 import { DateTimePicker } from "./date-time-picker";
+import { AlertModal } from "./alert-modal";
 
 type InventoryRecordActionsProps = {
   custodyStatus: string;
@@ -38,6 +39,7 @@ export function InventoryRecordActions({
   const router = useRouter();
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -112,12 +114,6 @@ export function InventoryRecordActions({
   }
 
   async function deleteRecord() {
-    const shouldDelete = window.confirm(`Delete device ${imei}?`);
-
-    if (!shouldDelete) {
-      return;
-    }
-
     setError("");
     setIsDeleting(true);
 
@@ -161,7 +157,7 @@ export function InventoryRecordActions({
         <button
           className="inline-flex items-center justify-center gap-1.5 rounded-[6px] bg-black px-3 py-2 text-xs font-bold text-white transition hover:bg-[#343434] disabled:cursor-wait disabled:opacity-50"
           disabled={busy}
-          onClick={deleteRecord}
+          onClick={() => setIsDeleteModalOpen(true)}
           type="button"
         >
           {isDeleting ? <LoadingSpinner className="size-3" /> : <Trash2 className="size-3" />}
@@ -321,8 +317,22 @@ export function InventoryRecordActions({
         </div>
       ) : null}
 
-      {error ? <p className="max-w-[240px] text-xs font-semibold text-red-600">{error}</p> : null}
+      {error ? <p className="max-w-[260px] text-xs font-semibold text-red-600">{error}</p> : null}
       {successMessage ? <p className="max-w-[260px] text-xs font-semibold text-green-700">{successMessage}</p> : null}
+
+      <AlertModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => {
+          setIsDeleteModalOpen(false);
+          deleteRecord();
+        }}
+        title="Delete Device"
+        description={`Are you sure you want to permanently delete device ${imei}?`}
+        confirmText="Delete"
+        type="delete"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

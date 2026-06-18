@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LoadingSpinner } from "./loading-spinner";
 import { DateTimePicker } from "./date-time-picker";
+import { AlertModal } from "./alert-modal";
 
 type TechnicianOption = {
   active: boolean;
@@ -42,6 +43,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showCongrats, setShowCongrats] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   // Follow-up States
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
   const [followUps, setFollowUps] = useState<any[]>([]);
@@ -205,10 +207,6 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
   }
 
   async function deleteCustomer() {
-    if (!confirm(`Are you sure you want to permanently delete ${name}? This will also remove their vehicles, work orders, meetings, and insurance policies. Any installed devices will be returned to inventory.`)) {
-      return;
-    }
-
     setError("");
     setLoading(true);
 
@@ -281,7 +279,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
         <button
           className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition hover:border-red-500 disabled:cursor-wait disabled:opacity-50"
           disabled={loading}
-          onClick={deleteCustomer}
+          onClick={() => setIsDeleteModalOpen(true)}
           title={`Delete ${name}`}
           type="button"
         >
@@ -576,6 +574,40 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
 
       {error ? <p className="max-w-[260px] text-xs font-semibold text-red-600">{error}</p> : null}
       {installSuccessMessage ? <p className="max-w-[260px] text-xs font-semibold text-green-700">{installSuccessMessage}</p> : null}
+
+      {showCongrats ? (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-[fadeIn_0.3s_ease-out]">
+          <div className="w-full max-w-[400px] rounded-[32px] bg-white p-8 text-center shadow-[0_0_80px_rgba(250,197,77,0.3)] animate-[slideUpFade_0.4s_ease-out_both]">
+            <div className="mx-auto mb-6 flex size-24 items-center justify-center rounded-full bg-[#FAC54D]/20 animate-[bounce_1s_ease-in-out_infinite]">
+              <Trophy className="size-12 text-[#e0b040]" />
+            </div>
+            <h2 className="mb-2 text-3xl font-black text-gray-900 tracking-tight">Congratulations!</h2>
+            <p className="mb-8 text-base font-medium text-gray-500">
+              The case for <strong className="text-gray-900">{name}</strong> has been successfully won and recorded!
+            </p>
+            <button
+              onClick={() => setShowCongrats(false)}
+              className="inline-flex h-14 w-full items-center justify-center rounded-full bg-black px-8 text-base font-bold text-white shadow-xl transition-all hover:scale-105 hover:bg-[#343434]"
+            >
+              Awesome
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <AlertModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => {
+          setIsDeleteModalOpen(false);
+          deleteCustomer();
+        }}
+        title="Delete Customer"
+        description={`Are you sure you want to permanently delete ${name}? This will also remove their vehicles, work orders, meetings, and insurance policies. Any installed devices will be returned to inventory.`}
+        confirmText="Delete"
+        type="delete"
+        isLoading={loading}
+      />
     </div>
   );
 }
