@@ -71,19 +71,24 @@ export function LeadRecordActions({
   const openFollowUpsId = searchParams.get("openFollowUps");
 
   const [error, setError] = useState("");
-  const [isSavingAssignment, setIsSavingAssignment] = useState(false);
-  const [technicians, setTechnicians] = useState<{ id: string; name: string; cities: string; deviceCount?: number }[]>([]);
-  const [devices, setDevices] = useState<{ id: string; imei: string; technicianName: string }[]>([]);
-  const [draftTechnicianId, setDraftTechnicianId] = useState(assignedTechnicianId);
+  // Assignment States
+  const [draftTechnicianId, setDraftTechnicianId] = useState(assignedTechnicianId || "");
   const [draftDeviceId, setDraftDeviceId] = useState(assignedDeviceId || "");
+  const [draftCustodyStatus, setDraftCustodyStatus] = useState("technician_hands");
+  const [isSavingAssignment, setIsSavingAssignment] = useState(false);
+  const [devices, setDevices] = useState<{ id: string; imei: string; technicianName: string; technician_id: string | null }[]>([]);
+  const [technicians, setTechnicians] = useState<{ id: string; name: string; cities: string; deviceCount?: number }[]>([]);
 
   // Follow-up States
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
   const [followUps, setFollowUps] = useState<any[]>([]);
   const [followUpsLoading, setFollowUpsLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [followUpReason, setFollowUpReason] = useState("");
   const [followUpNotes, setFollowUpNotes] = useState("");
   const [followUpNextAt, setFollowUpNextAt] = useState("");
+  const [followUpScreenshot, setFollowUpScreenshot] = useState<File | null>(null);
   const [isSavingFollowUp, setIsSavingFollowUp] = useState(false);
   const [selectedFollowUp, setSelectedFollowUp] = useState<any | null>(null);
 
@@ -101,6 +106,14 @@ export function LeadRecordActions({
   const [isSaving, setIsSaving] = useState(false);
 
   const busy = isSavingAssignment || isSavingFollowUp || isSaving || isDeleting;
+  const loading = isSavingAssignment || isSavingFollowUp || isSaving;
+
+  const filteredEditTechnicians = technicians.filter(t => {
+    if (!t.cities || !draftLocation) return false;
+    const techCities = t.cities.toLowerCase().split(',').map(c => c.trim()).filter(Boolean);
+    const loc = draftLocation.toLowerCase();
+    return techCities.some(city => loc.includes(city) || city.includes(loc));
+  });
 
   // Auto-open modal if specified in search parameters
   useEffect(() => {
@@ -169,6 +182,24 @@ export function LeadRecordActions({
     setIsSavingFollowUp(true);
 
     try {
+      let finalScreenshotUrl = "";
+      if (followUpScreenshot) {
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", followUpScreenshot);
+        const uploadRes = await fetch("/api/erp/upload", {
+          method: "POST",
+          body: uploadFormData,
+        });
+        if (!uploadRes.ok) {
+          const payload = await uploadRes.json();
+          setError(payload.error ?? "Failed to upload screenshot.");
+          setIsSavingFollowUp(false);
+          return;
+        }
+        const uploadPayload = await uploadRes.json();
+        finalScreenshotUrl = uploadPayload.url ?? "";
+      }
+
       const res = await fetch("/api/erp/leads/follow-up", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,6 +208,7 @@ export function LeadRecordActions({
           reason: followUpReason,
           notes: followUpNotes,
           nextFollowUpAt: followUpNextAt ? new Date(followUpNextAt).toISOString() : "",
+          screenshotUrl: finalScreenshotUrl,
         }),
       });
 
@@ -189,6 +221,7 @@ export function LeadRecordActions({
       setFollowUpReason("");
       setFollowUpNotes("");
       setFollowUpNextAt("");
+      setFollowUpScreenshot(null);
       await fetchFollowUps();
       router.refresh();
     } catch (err) {
@@ -199,17 +232,13 @@ export function LeadRecordActions({
   }
 
   async function deleteLead() {
-    if (!confirm(`Are you sure you want to permanently delete ${name}?`)) {
-      return;
-    }
-
     setError("");
     setIsDeleting(true);
 
     const response = await fetch("/api/erp/delete", {
       body: JSON.stringify({ id, moduleKey: "leads" }),
       headers: { "Content-Type": "application/json" },
-      method: "POST",
+      method: "DELETE",
     });
 
     setIsDeleting(false);
@@ -248,6 +277,7 @@ export function LeadRecordActions({
           whatsapp: draftWhatsapp,
           assigned_technician_id: draftTechnicianId || null,
           assigned_device_id: draftDeviceId || null,
+          assigned_device_custody_status: draftCustodyStatus,
         },
       }),
       headers: { "Content-Type": "application/json" },
@@ -268,15 +298,6 @@ export function LeadRecordActions({
 
   async function saveAssignment() {
     setError("");
-
-    if (draftTechnicianId) {
-      const selectedTech = technicians.find(t => t.id === draftTechnicianId);
-      if (selectedTech && (selectedTech.deviceCount === undefined || selectedTech.deviceCount === 0)) {
-        setError("This technician has no device in hand. First assign him a device and send him, then it will be added.");
-        return;
-      }
-    }
-    
     setIsSavingAssignment(true);
 
     const response = await fetch("/api/erp/update", {
@@ -286,6 +307,7 @@ export function LeadRecordActions({
         values: {
           assigned_technician_id: draftTechnicianId || null,
           assigned_device_id: draftDeviceId || null,
+          assigned_device_custody_status: draftCustodyStatus,
         },
       }),
       headers: { "Content-Type": "application/json" },
@@ -445,12 +467,23 @@ export function LeadRecordActions({
               value={draftTechnicianId}
             >
               <option value="">-- Unassigned --</option>
-              {technicians.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.cities})
+              {filteredEditTechnicians.length > 0 ? (
+                filteredEditTechnicians.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.cities})
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>
+                  ⚠️ No technician found for this city. Please add a technician first.
                 </option>
-              ))}
+              )}
             </select>
+            {filteredEditTechnicians.length === 0 && draftLocation && (
+              <span className="text-[11px] font-bold text-amber-600 mt-1">
+                ⚠️ No technician found for city: &quot;{draftLocation}&quot;. Please register a technician for this city first under Technician Operations.
+              </span>
+            )}
           </label>
 
           <label className="flex flex-col gap-1.5">
@@ -561,6 +594,20 @@ export function LeadRecordActions({
                 />
               </label>
 
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Screenshot (Optional)</span>
+                <input
+                  className="w-full text-sm text-gray-500 file:mr-4 file:rounded-[12px] file:border-0 file:bg-gray-100 file:px-4 file:py-2 file:text-sm file:font-bold file:text-gray-700 hover:file:bg-gray-200 transition-all cursor-pointer"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setFollowUpScreenshot(file);
+                    else setFollowUpScreenshot(null);
+                  }}
+                />
+              </label>
+
               <div className="flex justify-end pt-2">
                 <button
                   type="submit"
@@ -583,7 +630,6 @@ export function LeadRecordActions({
                 const loc = location.toLowerCase();
                 return techCities.some(city => loc.includes(city) || city.includes(loc));
               });
-              const otherTechnicians = technicians.filter(t => !localTechnicians.includes(t));
               
               return (
                 <div>
@@ -599,7 +645,7 @@ export function LeadRecordActions({
                         value={draftTechnicianId}
                       >
                         <option value="">-- Unassigned --</option>
-                        {localTechnicians.length > 0 && (
+                        {localTechnicians.length > 0 ? (
                           <optgroup label="📍 Local Technicians">
                             {localTechnicians.map((t) => (
                               <option key={t.id} value={t.id}>
@@ -607,20 +653,15 @@ export function LeadRecordActions({
                               </option>
                             ))}
                           </optgroup>
-                        )}
-                        {otherTechnicians.length > 0 && (
-                          <optgroup label="🌍 Other Technicians">
-                            {otherTechnicians.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.name} ({t.deviceCount || 0} Devices)
-                              </option>
-                            ))}
-                          </optgroup>
+                        ) : (
+                          <option value="" disabled>
+                            ⚠️ No technician found for this city. Please add a technician first.
+                          </option>
                         )}
                       </select>
                       {localTechnicians.length === 0 && (
-                        <p className="mt-2 text-[11px] font-medium text-amber-600">
-                          ⚠️ There is no registered technician to the client's location.
+                        <p className="mt-2 text-[11px] font-bold text-amber-600">
+                          ⚠️ No technician found for city: &quot;{location}&quot;. Please register a technician for this city first under Technician Operations.
                         </p>
                       )}
                     </div>
@@ -635,13 +676,34 @@ export function LeadRecordActions({
                         {assignedDeviceId ? (
                           <option value={assignedDeviceId}>{assignedDeviceImei} (Current)</option>
                         ) : null}
-                        {devices.map((d) => (
+                        {devices
+                          .filter(d => draftTechnicianId ? (d.technician_id === draftTechnicianId || !d.technician_id) : true)
+                          .map((d) => (
                           <option key={d.id} value={d.id}>
-                            {d.imei} {d.technicianName ? `(${d.technicianName})` : "(Unassigned)"}
+                            {d.imei} {d.technician_id ? `(Held by ${d.technicianName})` : "(Office Stock)"}
                           </option>
                         ))}
                       </select>
                     </label>
+                    {(() => {
+                      const selectedDevice = devices.find((d) => d.id === draftDeviceId);
+                      if (selectedDevice && !selectedDevice.technician_id) {
+                        return (
+                          <label className="block sm:col-span-2">
+                            <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Device Custody Status</span>
+                            <select
+                              className="h-12 w-full appearance-none rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                              onChange={(event) => setDraftCustodyStatus(event.target.value)}
+                              value={draftCustodyStatus}
+                            >
+                              <option value="technician_hands">Received by Technician</option>
+                              <option value="on_the_way">On the Way</option>
+                            </select>
+                          </label>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                   <div className="mt-4 flex justify-end">
                     <button
@@ -751,6 +813,15 @@ export function LeadRecordActions({
                   <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Additional Admin Notes</span>
                   <div className="rounded-[12px] bg-gray-50 border border-gray-100 p-4 max-h-[180px] overflow-y-auto">
                     <p className="text-xs font-semibold text-gray-700 whitespace-pre-wrap leading-relaxed">{selectedFollowUp.notes}</p>
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedFollowUp.screenshot_url ? (
+                <div>
+                  <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Attached Screenshot</span>
+                  <div className="rounded-[12px] bg-gray-50 border border-gray-100 p-2 overflow-hidden flex justify-center">
+                    <img src={selectedFollowUp.screenshot_url} alt="Follow-up Screenshot" className="max-h-[250px] object-contain rounded-[8px]" />
                   </div>
                 </div>
               ) : null}

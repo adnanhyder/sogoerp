@@ -6,6 +6,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     commissionIds?: string[];
     technicianId?: string;
+    receiptUrl?: string;
   };
 
   if (!body.technicianId || !body.commissionIds || !body.commissionIds.length) {
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
 
   const { error } = await supabase
     .from("commissions")
-    .update({ paid: true })
+    .update({ paid: true, receipt_url: body.receiptUrl || null })
     .eq("technician_id", body.technicianId)
     .in("id", body.commissionIds);
 

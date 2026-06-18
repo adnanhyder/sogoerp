@@ -1,4 +1,7 @@
-import { Plus, Search } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Plus, Search, ChevronUp, ChevronDown } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { AdminRecordsPanel } from "./admin-records-panel";
 import { ErpShell } from "./erp-shell";
@@ -8,6 +11,8 @@ import { InventoryRecordActions } from "./inventory-record-actions";
 import { LeadRecordActions } from "./lead-record-actions";
 import { TechnicianRecordActions } from "./technician-record-actions";
 import { InstalledDevicesTable } from "./installed-devices-table";
+import { PaidCommissionsTable } from "./paid-commissions-table";
+import { CompletedCustomersTable } from "./completed-customers-table";
 import type { CreateConfig } from "@/lib/create-config";
 
 type ModuleMetric = {
@@ -71,14 +76,22 @@ export function ModulePage({
   user,
   workflows,
 }: ModulePageProps) {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+
   const isInventory = activeHref === "/inventory";
   const isLeads = activeHref === "/leads";
   const isCustomers = activeHref === "/customers";
   const isTechnicians = activeHref === "/technicians";
   const isCoreAdmin = ["/inventory", "/leads", "/technicians", "/customers"].includes(activeHref);
   
-  const mainTableRows = isInventory ? tableRows.filter(row => row[1] !== "installed") : tableRows;
+  const mainTableRows = isInventory
+    ? tableRows.filter(row => row[1] !== "installed")
+    : isCustomers
+      ? tableRows.filter(row => row[14] !== "completed")
+      : tableRows;
+
   const installedDevices = isInventory ? tableRows.filter(row => row[1] === "installed") : [];
+  const completedCustomers = isCustomers ? tableRows.filter(row => row[14] === "completed") : [];
 
   function renderInventoryCell(cell: string, index: number) {
     if (index === 0) {
@@ -133,21 +146,17 @@ export function ModulePage({
   }
 
   const recordsTable = (
-    <div className={isCoreAdmin ? "overflow-hidden rounded-[8px] border border-[#eeeeee]" : "overflow-x-auto"}>
+    <div className="overflow-x-auto rounded-[16px] border border-gray-100 bg-white shadow-sm ring-1 ring-gray-100/50">
       <table
         className={`w-full border-collapse text-left text-sm ${
-          isInventory ? "min-w-[920px]" : isCoreAdmin ? "min-w-[900px]" : "min-w-[720px]"
+          isInventory ? "min-w-[1100px]" : isCustomers ? "min-w-[1250px]" : isLeads ? "min-w-[1250px]" : isTechnicians ? "min-w-[1150px]" : isCoreAdmin ? "min-w-[1000px]" : "min-w-[720px]"
         }`}
       >
-        <thead className={isCoreAdmin ? "bg-[#fbfbfb] text-[#343434]" : "text-[#343434]"}>
+        <thead className="bg-[#fbfbfb] text-gray-500 uppercase text-[10px] tracking-wider font-extrabold border-b border-gray-100">
           <tr>
             {tableColumns.map((column) => (
               <th
-                className={`font-medium ${
-                  isCoreAdmin
-                    ? "border-b border-[#eeeeee] px-4 py-3 text-xs uppercase tracking-[0.08em] text-[#777777]"
-                    : "pb-4"
-                }`}
+                className="px-6 py-4 font-extrabold text-[#7a7a7a]"
                 key={column}
               >
                 {column}
@@ -182,17 +191,13 @@ export function ModulePage({
 
               return (
                 <tr
-                  className={`border-t border-[#eeeeee] ${
-                    isCoreAdmin ? "transition hover:bg-[#fbfbfb]" : ""
-                  }`}
+                  className="border-t border-gray-100 transition hover:bg-[#fbfbfb]/80"
                   key={row.join("-")}
                 >
                   {visibleCells.map((cell, index) => (
                     <td
-                      className={`${
-                        isCoreAdmin ? "px-4 py-4 align-middle" : "py-4"
-                      } ${
-                        index === 0 && !isInventory ? "font-semibold text-black" : "text-[#343434]"
+                      className={`px-6 py-4.5 align-middle text-sm text-gray-700 ${
+                        index === 0 && !isInventory ? "font-bold text-black" : "font-medium"
                       }`}
                       key={`${cell}-${index}`}
                     >
@@ -200,7 +205,7 @@ export function ModulePage({
                     </td>
                   ))}
                   {isInventory ? (
-                    <td className="px-4 py-4 align-middle">
+                    <td className="px-6 py-4.5 align-middle">
                       <InventoryRecordActions
                         custodyStatus={inventoryCustodyStatus}
                         hasMic={inventoryHasMic === "Yes"}
@@ -213,7 +218,7 @@ export function ModulePage({
                     </td>
                   ) : null}
                   {isLeads ? (
-                    <td className="px-4 py-4 align-middle">
+                    <td className="px-6 py-4.5 align-middle">
                       <LeadRecordActions
                         assignedDeviceId={row[15] ?? ""}
                         assignedDeviceImei={row[16] ?? ""}
@@ -233,31 +238,36 @@ export function ModulePage({
                     </td>
                   ) : null}
                   {isCustomers ? (
-                    <td className="px-4 py-4 align-middle">
+                    <td className="px-6 py-4.5 align-middle">
                       <CustomerRecordActions
                         customerId={row[0] ?? ""}
                         installStatus={row[14] ?? "none"}
                         location={`${row[7] ?? ""} ${row[6] ?? ""} ${row[5] ?? ""}`}
                         name={row[1] ?? "Customer"}
                         sourceLeadId={row[15] ?? ""}
+                        assignedTechnicianId={row[17] ?? ""}
+                        assignedDeviceId={row[18] ?? ""}
                       />
                     </td>
                   ) : null}
                   {isTechnicians ? (
-                    <td className="px-4 py-4 align-middle">
+                    <td className="px-6 py-4.5 align-middle">
                       <TechnicianRecordActions
                         active={technicianActive}
                         authorizationPersonCnic={technicianAuthCnic}
-                        authorizationPersonName={row[11] ?? ""}
+                        authorizationPersonName={row[12] ?? ""}
                         authorizationPersonPhone={row[5] ?? ""}
                         authorizationRelation={technicianAuthRelation}
                         cities={row[8] ?? ""}
                         cnic={row[7] ?? ""}
-                        commissionRate={row[12] ?? "0"}
+                        commissionRate={row[13] ?? "0"}
                         disputed={technicianDisputed}
+                        disputeReason={row[16] ?? ""}
                         id={technicianId}
                         name={row[6] ?? ""}
                         phone={row[9] ?? ""}
+                        unpaidPending={Number(row[17] ?? 0)}
+                        installedCount={Number(row[18] ?? 0)}
                       />
                     </td>
                   ) : null}
@@ -291,7 +301,7 @@ export function ModulePage({
             </section>
           ) : null}
 
-          <article className="rounded-[8px] border border-[#d2d2d2] bg-white p-5 sm:p-7">
+          <article className="rounded-[16px] border border-gray-100 bg-white p-6 sm:p-8 shadow-sm ring-1 ring-gray-100/50">
             <AdminRecordsPanel
               actionLabel={primaryAction}
               config={createConfig}
@@ -305,10 +315,22 @@ export function ModulePage({
             </AdminRecordsPanel>
           </article>
 
+          {isInventory && installedDevices.length > 0 ? (
+            <InstalledDevicesTable columns={tableColumns} rows={installedDevices} />
+          ) : null}
+
+          {isTechnicians && (
+            <PaidCommissionsTable />
+          )}
+
+          {isCustomers && completedCustomers.length > 0 ? (
+            <CompletedCustomersTable columns={tableColumns} rows={completedCustomers} />
+          ) : null}
+
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {metrics.map((metric) => (
               <article
-                className="rounded-[8px] border border-[#d2d2d2] bg-white p-5"
+                className="rounded-[16px] border border-gray-100 bg-white p-6 shadow-sm ring-1 ring-gray-100/50 transition hover:shadow-md hover:scale-[1.01]"
                 key={metric.label}
               >
                 <p className="text-sm font-medium text-[#777777]">{metric.label}</p>
@@ -327,7 +349,7 @@ export function ModulePage({
   return (
     <ErpShell activeHref={activeHref} title={title} user={user}>
       <div className="space-y-3">
-        <section className="rounded-[8px] border border-[#d2d2d2] bg-white p-5 sm:p-7">
+        <section className="rounded-[16px] border border-gray-100 bg-white p-6 sm:p-8 shadow-sm ring-1 ring-gray-100/50">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
               <p className="text-sm font-medium text-[#777777]">ERP Module</p>
@@ -336,30 +358,20 @@ export function ModulePage({
               </h2>
               <p className="mt-3 text-sm leading-6 text-[#777777]">{description}</p>
             </div>
-            {createConfig && !isInventory ? (
-              <a
-                href="#create-record"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-[6px] bg-black px-5 text-sm font-bold text-white"
+            {createConfig ? (
+              <button
+                onClick={() => setIsCreateOpen(!isCreateOpen)}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-[6px] bg-black px-5 text-sm font-bold text-white transition-colors hover:bg-gray-800"
+                type="button"
               >
-                <Plus className="size-4" />
-                {primaryAction}
-              </a>
+                {isCreateOpen ? <ChevronUp className="size-4" /> : <Plus className="size-4" />}
+                {isCreateOpen ? "Close Panel" : primaryAction || "Add Record"}
+              </button>
             ) : null}
           </div>
-          {createConfig && isInventory ? (
-            <details
-              className="mt-5 rounded-[8px] border border-[#d2d2d2] bg-[#fbfbfb] p-3"
-              id="create-record"
-            >
-              <summary className="inline-flex h-12 cursor-pointer list-none items-center justify-center gap-2 rounded-[6px] bg-black px-5 text-sm font-bold text-white [&::-webkit-details-marker]:hidden">
-                <Plus className="size-4" />
-                Add Device
-              </summary>
-              <CreateRecordForm config={createConfig} />
-            </details>
-          ) : createConfig ? (
-            <div id="create-record">
-              <CreateRecordForm config={createConfig} />
+          {createConfig && isCreateOpen ? (
+            <div id="create-record" className="mt-5 animate-[fadeIn_0.3s_ease-out]">
+              <CreateRecordForm config={createConfig} onSuccess={() => setIsCreateOpen(false)} />
             </div>
           ) : null}
         </section>
@@ -373,7 +385,7 @@ export function ModulePage({
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (
             <article
-              className="rounded-[8px] border border-[#d2d2d2] bg-white p-5"
+              className="rounded-[16px] border border-gray-100 bg-white p-6 shadow-sm ring-1 ring-gray-100/50 transition hover:shadow-md hover:scale-[1.01]"
               key={metric.label}
             >
               <p className="text-sm font-medium text-[#777777]">{metric.label}</p>
@@ -386,7 +398,7 @@ export function ModulePage({
         </section>
 
         <section className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
-          <article className="rounded-[8px] border border-[#d2d2d2] bg-white p-5 sm:p-7">
+          <article className="rounded-[16px] border border-gray-100 bg-white p-6 sm:p-8 shadow-sm ring-1 ring-gray-100/50">
             <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-lg font-bold text-black">{title} Records</h3>
               <form action={activeHref} className="flex flex-col gap-2 sm:flex-row" method="get">
@@ -416,7 +428,7 @@ export function ModulePage({
             {recordsTable}
           </article>
 
-          <article className="rounded-[8px] border border-[#d2d2d2] bg-white p-5 sm:p-7">
+          <article className="rounded-[16px] border border-gray-100 bg-white p-6 sm:p-8 shadow-sm ring-1 ring-gray-100/50">
             <h3 className="text-lg font-bold text-black">Expected Workflow</h3>
             <div className="mt-5 space-y-3">
               {workflows.map((workflow, index) => (

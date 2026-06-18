@@ -51,6 +51,10 @@ export async function PATCH(request: Request) {
     if (typeof values.disputed === "boolean") {
       payload.disputed = values.disputed;
     }
+
+    if ("dispute_reason" in values) {
+      payload.dispute_reason = values.dispute_reason;
+    }
   }
 
   if (moduleKey === "inventory") {
@@ -101,6 +105,34 @@ export async function PATCH(request: Request) {
     }
   } catch {
     return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  }
+
+  if (moduleKey === "leads" && payload.assigned_device_id && payload.assigned_technician_id) {
+    const { data: device } = await supabase
+      .from("devices")
+      .select("technician_id")
+      .eq("id", payload.assigned_device_id)
+      .single();
+
+    if (device && !device.technician_id) {
+      // It's office stock, assign it to the technician first!
+      const { error: deviceUpdateError } = await supabase
+        .from("devices")
+        .update({
+          technician_id: payload.assigned_technician_id,
+          custody_status: payload.assigned_device_custody_status || "technician_hands",
+        })
+        .eq("id", payload.assigned_device_id);
+
+      if (deviceUpdateError) {
+        return NextResponse.json({ error: deviceUpdateError.message }, { status: 400 });
+      }
+    }
+  }
+
+  // Remove the custody status from payload before updating the leads table
+  if (payload.assigned_device_custody_status !== undefined) {
+    delete payload.assigned_device_custody_status;
   }
 
   const { error } = await supabase.from(config.table).update(payload).eq("id", body.id);

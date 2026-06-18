@@ -15,7 +15,7 @@ export async function ModuleRoute({ moduleKey, searchQuery = "" }: ModuleRoutePr
   const supabase = await createClient();
   const config = moduleConfigs[moduleKey];
   const moduleData = await getModuleData(supabase, moduleKey, { searchQuery });
-  const createConfig = createConfigs[moduleKey as CreateModuleKey];
+  const createConfig = moduleKey === "customers" ? undefined : createConfigs[moduleKey as CreateModuleKey];
 
   return (
     <ModulePage

@@ -94,7 +94,7 @@ export function AdminRecordsPanel({
 
       {open ? (
         <div className="mb-5 rounded-[8px] border border-[#d2d2d2] bg-[#fbfbfb] p-4">
-          {config ? <CreateRecordForm config={config} /> : null}
+          {config ? <CreateRecordForm config={config} onSuccess={() => setOpen(false)} /> : null}
         </div>
       ) : null}
 

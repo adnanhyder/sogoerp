@@ -431,6 +431,7 @@ export async function getModuleData(
               { label: "On The Way", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("custody_status", "on_the_way"))), detail: "Courier / technician handoff" },
               { label: "With Technicians", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("custody_status", "received_by_technician"))), detail: "Received by technicians" },
               { label: "Faulty", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("status", "faulty"))), detail: "Pending replacement" },
+              { label: "Installed Devices", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("status", "installed"))), detail: "Successfully installed" },
             ],
             rows: await inventoryRows(supabase, options.searchQuery),
           },
@@ -482,7 +483,7 @@ export async function getModuleData(
               { label: "Customers", value: formatCount(await countRows(supabase, "customers")), detail: "All customer records" },
               { label: "Meetings Due", value: formatCount(await countRows(supabase, "customer_meetings", (query) => query.lte("scheduled_at", new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()).in("status", ["scheduled", "rescheduled"]))), detail: "Due within 24 hours" },
               { label: "Scheduled", value: formatCount(await countRows(supabase, "customer_meetings", (query) => query.in("status", ["scheduled", "rescheduled"]))), detail: "Open technician meetings" },
-              { label: "Completed", value: formatCount(await countRows(supabase, "customer_meetings", (query) => query.eq("status", "completed"))), detail: "Finished customer meetings" },
+              { label: "Completed", value: formatCount(await countRows(supabase, "work_orders", (query) => query.eq("status", "completed"))), detail: "Completed installations" },
             ],
             rows: await customerRows(supabase, options.searchQuery),
           },
@@ -566,7 +567,7 @@ function displayDeviceStatus(value: unknown) {
 async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
   let query = supabase
     .from("devices")
-    .select("id,imei,status,custody_status,has_mic,purchase_cost,created_at,technician_id,technicians(name,cities),customer_id,customers(full_name)")
+    .select("id,imei,status,custody_status,has_mic,purchase_cost,sale_price,installation_date,created_at,technician_id,technicians(name,phone,cities),customer_id,customers(full_name,phone,location)")
     .order("created_at", { ascending: false });
 
   const trimmedSearch = searchQuery.trim();
@@ -598,20 +599,25 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
     const technicianId = typeof row.technician_id === "string" ? row.technician_id : "";
 
     return [
-      String(row.id ?? ""),
-      String(row.status ?? "-").replaceAll("_", " "),
-      String(row.custody_status ?? "company_hands"),
-      technicianId,
-      String(row.imei ?? "-"),
-      displayDeviceStatus(row.status),
-      row.status === "installed" ? "Customer Hands" : String(row.custody_status ?? "company_hands").replaceAll("_", " "),
-      row.has_mic ? "Yes" : "No",
-      row.status === "installed" ? "None (Installed)" : (relatedField(row.technicians, "name") ?? "-"),
-      relatedField(row.customers, "full_name") ?? "-",
-      relatedField(row.technicians, "cities") ?? "-",
-      technicianId ? formatCount(technicianDeviceCounts.get(technicianId)) : "0",
-      String(row.purchase_cost ?? "0"),
-      formatDateTime(String(row.created_at ?? "")),
+      String(row.id ?? ""), // 0
+      String(row.status ?? "-").replaceAll("_", " "), // 1
+      String(row.custody_status ?? "company_hands"), // 2
+      technicianId, // 3
+      String(row.imei ?? "-"), // 4
+      displayDeviceStatus(row.status), // 5
+      row.status === "installed" ? "Customer Hands" : String(row.custody_status ?? "company_hands").replaceAll("_", " "), // 6
+      row.has_mic ? "Yes" : "No", // 7
+      relatedField(row.technicians, "name") ?? "-", // 8: technician name (keep it for installed too!)
+      relatedField(row.customers, "full_name") ?? "-", // 9
+      relatedField(row.technicians, "cities") ?? "-", // 10
+      technicianId ? formatCount(technicianDeviceCounts.get(technicianId)) : "0", // 11
+      String(row.purchase_cost ?? "0"), // 12
+      formatDateTime(String(row.created_at ?? "")), // 13
+      relatedField(row.technicians, "phone") ?? "-", // 14: technician phone
+      relatedField(row.customers, "phone") ?? "-", // 15: customer phone
+      relatedField(row.customers, "location") ?? "-", // 16: customer city
+      String(row.sale_price ?? "0"), // 17: sale price
+      row.installation_date ? formatDate(String(row.installation_date)) : "-", // 18: installation date
     ];
   });
 }
@@ -627,7 +633,7 @@ function technicianStatus(active: unknown, disputed: unknown) {
 async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
   let query = supabase
     .from("technicians")
-    .select("id,name,cnic,cities,phone,authorization_person_name,authorization_person_phone,authorization_person_cnic,authorization_relation,commission_rate,active,disputed,created_at")
+    .select("id,name,cnic,cities,phone,authorization_person_name,authorization_person_phone,authorization_person_cnic,authorization_relation,commission_rate,active,disputed,dispute_reason,created_at")
     .order("created_at", { ascending: false });
 
   const trimmedSearch = searchQuery.trim();
@@ -674,6 +680,9 @@ async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
       String(row.commission_rate ?? "0"),
       technicianStatus(row.active, row.disputed),
       formatDateTime(String(row.created_at ?? "")),
+      String(row.dispute_reason ?? ""),
+      String(unpaidCommissions.get(technicianId) || 0),
+      String(completedCounts.get(technicianId) || 0),
     ];
   });
 }
@@ -748,7 +757,7 @@ function technicianMatchScore(customerLocation: string, technician: Record<strin
 async function customerRows(supabase: SupabaseClient, searchQuery = "") {
   let query = supabase
     .from("customers")
-    .select("id,full_name,phone,whatsapp,email,address,area,location,vehicle_type,budget,notes,source_lead_id,created_at")
+    .select("id,full_name,phone,whatsapp,email,address,area,location,vehicle_type,budget,notes,source_lead_id,created_at,leads!source_lead_id(assigned_technician_id,assigned_device_id,technicians(name))")
     .order("created_at", { ascending: false });
 
   const trimmedSearch = searchQuery.trim();
@@ -795,6 +804,10 @@ async function customerRows(supabase: SupabaseClient, searchQuery = "") {
       .map((match) => String(match.technician.name ?? "-"))
       .join(", ");
     const nextFollowUp = followUpsByLead.get(String(row.source_lead_id ?? ""));
+    const leadsData = row.leads as Record<string, unknown> | null;
+    const assignedTechnicianId = leadsData?.assigned_technician_id ? String(leadsData.assigned_technician_id) : "";
+    const assignedDeviceId = leadsData?.assigned_device_id ? String(leadsData.assigned_device_id) : "";
+    const assignedTechnicianName = leadsData ? (relatedField(leadsData.technicians, "name") ?? "") : "";
 
     return [
       customerId, // 0
@@ -811,9 +824,13 @@ async function customerRows(supabase: SupabaseClient, searchQuery = "") {
       suggested || "No area match", // 11
       nextFollowUp ?? "-", // 12
       formatDateTime(String(row.created_at ?? "")), // 13
-      installStatuses.get(customerId) === "completed" ? "INSTALLED ✅" : (installStatuses.get(customerId) ?? "none"), // 14
+      installStatuses.get(customerId)?.status ?? "none", // 14 - raw status: "completed", "pending", or "none"
       String(row.source_lead_id ?? ""), // 15
       assignedDevices.get(customerId) || "-", // 16
+      assignedTechnicianId, // 17
+      assignedDeviceId, // 18
+      assignedTechnicianName, // 19: technician name who installed
+      installStatuses.get(customerId)?.completedAt ?? "-", // 20: installed completed_at
     ];
   });
 }
@@ -904,7 +921,7 @@ async function deviceCountsByTechnician(supabase: SupabaseClient, technicianIds:
   const { data, error } = await supabase
     .from("devices")
     .select("technician_id")
-    .eq("custody_status", "technician_hands")
+    .in("custody_status", ["technician_hands", "received_by_technician", "on_the_way"])
     .in("technician_id", technicianIds);
 
   if (error) {
@@ -1031,22 +1048,23 @@ async function tableRows(supabase: SupabaseClient, table: string, columns: strin
 }
 
 async function installStatusByCustomer(supabase: SupabaseClient, customerIds: string[]) {
-  const statusMap = new Map<string, string>();
+  const statusMap = new Map<string, { status: string; completedAt: string }>();
   if (!customerIds.length) return statusMap;
 
   const { data, error } = await supabase
     .from("work_orders")
-    .select("customer_id,status")
+    .select("customer_id,status,completed_at")
     .in("customer_id", customerIds);
 
   if (!error && data) {
     for (const row of data) {
       const cid = String(row.customer_id);
-      const currentStatus = statusMap.get(cid);
+      const current = statusMap.get(cid);
+      const completedAtStr = row.completed_at ? formatDateTime(String(row.completed_at)) : "-";
       if (row.status === "assigned" || row.status === "in_progress") {
-        statusMap.set(cid, "pending");
-      } else if (row.status === "completed" && currentStatus !== "pending") {
-        statusMap.set(cid, "completed");
+        statusMap.set(cid, { status: "pending", completedAt: "-" });
+      } else if (row.status === "completed" && (!current || current.status !== "pending")) {
+        statusMap.set(cid, { status: "completed", completedAt: completedAtStr });
       }
     }
   }

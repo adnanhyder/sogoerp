@@ -160,7 +160,7 @@ export default async function DashboardPage() {
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {kpis.map((card) => (
             <article
-              className="rounded-[8px] border border-[#d2d2d2] bg-white p-5"
+              className="rounded-[16px] border border-gray-100 bg-white p-6 shadow-sm ring-1 ring-gray-100/50 transition hover:shadow-md hover:scale-[1.01]"
               key={card.label}
             >
               <p className="text-sm font-medium text-[#777777]">{card.label}</p>
@@ -174,8 +174,8 @@ export default async function DashboardPage() {
 
         <section className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.9fr)]">
           <div className="space-y-3">
-            <article className="rounded-[8px] border border-[#d2d2d2] bg-white">
-              <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+            <article className="rounded-[16px] border border-gray-100 bg-white shadow-sm ring-1 ring-gray-100/50">
+              <div className="flex flex-col gap-4 px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
                 <div>
                   <h2 className="text-lg font-bold text-black">Fleet Activity</h2>
                   <p className="mt-1 text-sm text-[#777777]">
@@ -239,7 +239,7 @@ export default async function DashboardPage() {
                 </svg>
               </div>
 
-              <div className="grid border-t border-[#d2d2d2] px-5 py-5 sm:grid-cols-4 sm:px-7">
+              <div className="grid border-t border-gray-100 px-6 py-6 sm:grid-cols-4 sm:px-8 bg-gray-50/30 rounded-b-[16px]">
                 {stats.map((stat, index) => {
                   const Icon = statIcons[index] ?? Activity;
 
@@ -258,71 +258,71 @@ export default async function DashboardPage() {
               </div>
             </article>
 
-            <article className="rounded-[8px] border border-[#d2d2d2] bg-white p-5 sm:p-7">
+            <article className="rounded-[16px] border border-gray-100 bg-white p-6 sm:p-8 shadow-sm ring-1 ring-gray-100/50">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-black">Recent Operations</h2>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-                  <thead className="text-[#343434]">
+              <div className="overflow-x-auto rounded-[12px] border border-gray-100 bg-white">
+                <table className="w-full min-w-[850px] border-collapse text-left text-sm">
+                  <thead className="bg-[#fbfbfb] text-gray-500 uppercase text-[10px] tracking-wider font-extrabold border-b border-gray-100">
                     <tr>
                       {["Name", "Amount", "Date", "Status", "Reference"].map((heading) => (
-                        <th className="pb-4 font-medium" key={heading}>
+                        <th className="px-6 py-3.5 font-extrabold text-[#7a7a7a]" key={heading}>
                           {heading}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-100">
                     {operations.length ? (
                     operations.map((operation) => (
-                      <tr className="border-t border-[#eeeeee]" key={operation.id}>
-                        <td className="py-4">
+                      <tr className="hover:bg-[#fbfbfb]/80 transition-colors" key={operation.id}>
+                        <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="grid size-12 place-items-center rounded-[6px] border border-[#d2d2d2] bg-[#fbfbfb]">
-                              <MapPinned className="size-5 text-[#343434]" />
+                            <div className="grid size-10 place-items-center rounded-[8px] border border-gray-100 bg-gray-50">
+                              <MapPinned className="size-4 text-gray-600" />
                             </div>
                             <div>
-                              <p className="font-semibold text-black">{operation.name}</p>
-                              <p className="mt-1 text-xs text-[#999999]">{operation.customer}</p>
+                              <p className="font-bold text-gray-900">{operation.name}</p>
+                              <p className="mt-0.5 text-xs font-semibold text-gray-500">{operation.customer}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 text-lg font-bold text-black">{operation.amount}</td>
-                        <td className="py-4">
-                          <p className="font-semibold text-black">{operation.date}</p>
-                          <p className="mt-1 text-xs text-[#999999]">09:45 am</p>
+                        <td className="px-6 py-4 text-base font-black text-green-700 tabular-nums">{operation.amount}</td>
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-gray-900">{operation.date}</p>
+                           <p className="mt-0.5 text-[10px] font-bold text-gray-400">09:45 AM</p>
                         </td>
-                        <td className="py-4">
+                        <td className="px-6 py-4">
                           <span
-                            className={`inline-flex h-9 items-center rounded-[6px] border px-4 font-semibold ${
+                            className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-bold ${
                               operation.status === "Paid"
-                                ? "border-black bg-black text-white"
-                                : "border-[#d2d2d2] bg-white text-[#343434]"
+                                ? "border-green-200 bg-green-50 text-green-700"
+                                : "border-gray-200 bg-gray-50 text-gray-700"
                             }`}
                           >
                             {operation.status}
                           </span>
                         </td>
-                        <td className="py-4 font-semibold text-black">{operation.id}</td>
-                      </tr>
-                    ))
-                    ) : (
-                      <tr className="border-t border-[#eeeeee]">
-                        <td className="py-8 text-center text-sm font-semibold text-[#777777]" colSpan={5}>
-                          No work orders found yet.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                        <td className="px-6 py-4 font-bold text-black tabular-nums">{operation.id}</td>
+                       </tr>
+                     ))
+                     ) : (
+                       <tr>
+                         <td className="px-6 py-8 text-center text-sm font-semibold text-gray-500" colSpan={5}>
+                           No work orders found yet.
+                         </td>
+                       </tr>
+                     )}
+                   </tbody>
+                 </table>
+               </div>
             </article>
           </div>
 
           <div className="space-y-3">
-            <article className="rounded-[8px] border border-[#d2d2d2] bg-white p-5 sm:p-7">
+            <article className="rounded-[16px] border border-gray-100 bg-white p-6 sm:p-8 shadow-sm ring-1 ring-gray-100/50">
               <h2 className="text-lg font-bold text-black">Lead Funnel</h2>
               <div className="mt-5 space-y-3">
                 {pipelineStages.map((stage) => (
@@ -358,7 +358,7 @@ export default async function DashboardPage() {
               </div>
             </article>
 
-            <article className="rounded-[8px] border border-[#d2d2d2] bg-white p-5 sm:p-7">
+            <article className="rounded-[16px] border border-gray-100 bg-white p-6 sm:p-8 shadow-sm ring-1 ring-gray-100/50">
               <h2 className="text-lg font-bold text-black">Analytics</h2>
               <div className="mt-6 flex h-[150px] items-end justify-between gap-2">
                 {bars.map((bar, index) => (
@@ -377,7 +377,7 @@ export default async function DashboardPage() {
 
             {moduleSnapshots.map((snapshot) => (
               <article
-                className="rounded-[8px] border border-[#d2d2d2] bg-white p-5"
+                className="rounded-[16px] border border-gray-100 bg-white p-6 shadow-sm ring-1 ring-gray-100/50 transition hover:shadow-md hover:scale-[1.01]"
                 key={snapshot.title}
               >
                 <h2 className="text-lg font-bold text-black">{snapshot.title}</h2>
@@ -403,7 +403,7 @@ export default async function DashboardPage() {
 
             return (
               <a
-                className="rounded-[8px] border border-[#d2d2d2] bg-white p-5 transition hover:border-black"
+                className="rounded-[16px] border border-gray-100 bg-white p-6 shadow-sm ring-1 ring-gray-100/50 transition hover:shadow-md hover:scale-[1.02] hover:border-black"
                 href={module.href}
                 key={module.href}
               >

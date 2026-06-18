@@ -21,6 +21,8 @@ type CustomerRecordActionsProps = {
   location: string;
   name: string;
   sourceLeadId?: string;
+  assignedTechnicianId?: string;
+  assignedDeviceId?: string;
 };
 
 function localDateTimeNow() {
@@ -38,7 +40,7 @@ function isSuggested(location: string, technician: TechnicianOption) {
     .some((part) => part.length > 2 && coverage.includes(part));
 }
 
-export function CustomerRecordActions({ customerId, installStatus = "none", location, name, sourceLeadId }: CustomerRecordActionsProps) {
+export function CustomerRecordActions({ customerId, installStatus = "none", location, name, sourceLeadId, assignedTechnicianId, assignedDeviceId }: CustomerRecordActionsProps) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -58,8 +60,8 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
 
   const [isInstallOpen, setIsInstallOpen] = useState(false);
   const [devices, setDevices] = useState<{ id: string; imei: string; technicianName: string }[]>([]);
-  const [installDeviceId, setInstallDeviceId] = useState("");
-  const [installTechnicianId, setInstallTechnicianId] = useState("");
+  const [installDeviceId, setInstallDeviceId] = useState(assignedDeviceId || "");
+  const [installTechnicianId, setInstallTechnicianId] = useState(assignedTechnicianId || "");
   const [installCompletedAt, setInstallCompletedAt] = useState(localDateTimeNow);
   const [installSalePrice, setInstallSalePrice] = useState("");
   const [installCommissionAmount, setInstallCommissionAmount] = useState("");
@@ -84,7 +86,24 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
           return bSuggested - aSuggested || a.name.localeCompare(b.name);
         });
         setTechnicians(ordered);
-        setDevices(devPayload.devices ?? []);
+
+        let deviceList = devPayload.devices ?? [];
+
+        // If a device was pre-assigned (e.g. already installed), fetch it specifically
+        // so it still appears in the dropdown even though it's filtered out of the available list
+        if (assignedDeviceId && !deviceList.some((d: any) => d.id === assignedDeviceId)) {
+          try {
+            const assignedDevRes = await fetch(`/api/erp/options/devices?includeId=${assignedDeviceId}`, { cache: "no-store" });
+            const assignedDevPayload = (await assignedDevRes.json()) as { device?: any };
+            if (assignedDevPayload.device) {
+              deviceList = [assignedDevPayload.device, ...deviceList];
+            }
+          } catch {
+            // If specific fetch fails, just continue with available devices list
+          }
+        }
+
+        setDevices(deviceList);
       }
     }
 
@@ -93,7 +112,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
     return () => {
       ignore = true;
     };
-  }, [location]);
+  }, [location, assignedDeviceId]);
 
   async function markInstallSuccess() {
     if (!installDeviceId) {
@@ -251,15 +270,13 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
       </div>
 
       {installStatus === "completed" ? (
-        <button
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-[6px] bg-green-600 px-3 text-xs font-bold text-white cursor-not-allowed select-none"
-          disabled
-          title="This customer's case has already been won"
-          type="button"
+        <div
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-[6px] bg-green-50 px-3 text-xs font-bold text-green-700 border border-green-200"
+          title="This customer's device has been installed successfully"
         >
-          <Trophy className="size-3" />
-          Case Won ✓
-        </button>
+          <CheckCircle2 className="size-3" />
+          Installed Successfully
+        </div>
       ) : (
         <button
           className="inline-flex h-9 items-center justify-center gap-2 rounded-[6px] bg-black px-3 text-xs font-bold text-white transition hover:bg-[#343434] disabled:cursor-wait disabled:opacity-60"
@@ -309,9 +326,10 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Device (IMEI)</span>
                 <select
-                  className="h-12 w-full rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  className={`h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20 ${assignedDeviceId ? "bg-gray-100 cursor-not-allowed text-gray-600" : "bg-white"}`}
                   onChange={(event) => setInstallDeviceId(event.target.value)}
                   value={installDeviceId}
+                  disabled={!!assignedDeviceId}
                 >
                   <option value="">Select a device</option>
                   {devices.map((device) => (
@@ -325,13 +343,14 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Installed By</span>
                 <select
-                  className="h-12 w-full rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  className={`h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20 ${assignedTechnicianId ? "bg-gray-100 cursor-not-allowed text-gray-600" : "bg-white"}`}
                   onChange={(event) => setInstallTechnicianId(event.target.value)}
                   value={installTechnicianId}
+                  disabled={!!assignedTechnicianId}
                 >
                   <option value="">Select technician</option>
                   {technicians.map((technician) => (
-                    <option disabled={!technician.active} key={technician.id} value={technician.id}>
+                    <option disabled={!technician.active && technician.id !== installTechnicianId} key={technician.id} value={technician.id}>
                       {technician.name}
                     </option>
                   ))}
@@ -417,7 +436,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
                   <label className="block">
                     <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Client's Reason for Not Meeting</span>
                     <textarea
-                      className="h-20 w-full rounded-[12px] border-2 border-gray-200 p-3 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                      className="h-20 w-full rounded-[12px] border border-gray-200 bg-white p-3 text-sm font-semibold text-gray-800 outline-none transition-all placeholder:text-gray-400 focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/10"
                       onChange={(e) => setFollowUpReason(e.target.value)}
                       placeholder="Why did the technician meeting fail? (e.g., client out of city, cancelled, not reachable...)"
                       value={followUpReason}
@@ -428,7 +447,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
                   <label className="block">
                     <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Additional Admin Notes</span>
                     <textarea
-                      className="h-20 w-full rounded-[12px] border-2 border-gray-200 p-3 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                      className="h-20 w-full rounded-[12px] border border-gray-200 bg-white p-3 text-sm font-semibold text-gray-800 outline-none transition-all placeholder:text-gray-400 focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/10"
                       onChange={(e) => setFollowUpNotes(e.target.value)}
                       placeholder="Enter additional meeting details or technician feedback..."
                       value={followUpNotes}
@@ -438,7 +457,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
                   <label className="block">
                     <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Next Follow-up Date & Time</span>
                     <DateTimePicker
-                      className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                      className="h-12 w-full rounded-[12px] border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/10"
                       onChange={setFollowUpNextAt}
                       value={followUpNextAt}
                     />
@@ -448,7 +467,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
                     <button
                       type="submit"
                       disabled={isSavingFollowUp}
-                      className="inline-flex h-12 items-center justify-center gap-2 rounded-[12px] bg-[#FAC54D] px-8 text-sm font-bold text-gray-900 shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#e0b040] hover:shadow-lg focus:ring-4 focus:ring-[#FAC54D]/30 disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0"
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#FAC54D] px-6 text-sm font-bold text-gray-900 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#e0b040] hover:shadow-md focus:ring-4 focus:ring-[#FAC54D]/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
                     >
                       {isSavingFollowUp ? <LoadingSpinner className="size-4" /> : null}
                       {isSavingFollowUp ? "Logging..." : "Log Follow-up"}
@@ -459,7 +478,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
                 <div className="my-6 h-px bg-gray-100" />
               </>
             ) : (
-              <div className="mb-6 rounded-[12px] border border-[#FAC54D]/30 bg-[#FAC54D]/10 p-4 text-center text-sm font-bold text-[#b0882e]">
+              <div className="mb-6 rounded-[12px] border border-[#FAC54D]/20 bg-[#FAC54D]/5 p-4 text-center text-sm font-bold text-[#b0882e]">
                 This case has been won. Follow-up notes are read-only.
               </div>
             )}
@@ -485,22 +504,22 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
                       key={item.id} 
                       onClick={() => setSelectedFollowUp(item)}
                       title="Click to view details in a popup"
-                      className="relative rounded-[16px] border border-gray-100 bg-gray-50/50 p-4 transition-all hover:bg-white hover:border-[#FAC54D]/50 hover:shadow-sm cursor-pointer group"
+                      className="relative rounded-[16px] border border-gray-100 bg-gray-50/50 p-4 transition-all hover:bg-white hover:border-[#FAC54D]/40 hover:shadow-sm cursor-pointer group"
                     >
                       <div className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider mb-2">
                         Logged on {new Date(item.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                       </div>
                       <div className="mb-2">
                         <span className="text-[10px] font-extrabold text-gray-400 uppercase block tracking-wider mb-0.5">Reason for Not Meeting</span>
-                        <p className="text-sm font-bold text-gray-900 group-hover:text-[#b58b29] transition-colors">{item.reason}</p>
+                        <p className="text-sm font-semibold text-gray-900 group-hover:text-[#b58b29] transition-colors">{item.reason}</p>
                       </div>
                       {item.notes ? (
                         <div className="mb-2">
                           <span className="text-[10px] font-extrabold text-gray-400 uppercase block tracking-wider mb-0.5">Admin Notes</span>
-                          <p className="text-xs font-semibold text-gray-700 line-clamp-1">{item.notes}</p>
+                          <p className="text-xs font-semibold text-gray-600 line-clamp-1">{item.notes}</p>
                         </div>
                       ) : null}
-                      <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
+                      <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between text-xs bg-gray-100/50 -mx-4 -mb-4 px-4 py-2.5 rounded-b-[16px]">
                         <span className="text-[#b58b29] font-bold">Next Scheduled Follow-up:</span>
                         <span className="text-gray-900 font-bold">
                           {new Date(item.next_follow_up_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
@@ -538,7 +557,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
               <div>
                 <span className="mb-1.5 block text-[11px] font-extrabold text-[#b58b29] uppercase tracking-wider">Client's Reason for Not Meeting</span>
                 <div className="rounded-[12px] bg-gray-50 border border-gray-100 p-4">
-                  <p className="text-sm font-bold text-gray-900 leading-relaxed whitespace-pre-wrap">{selectedFollowUp.reason}</p>
+                  <p className="text-sm font-semibold text-gray-900 leading-relaxed whitespace-pre-wrap">{selectedFollowUp.reason}</p>
                 </div>
               </div>
 
@@ -551,9 +570,9 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
                 </div>
               ) : null}
 
-              <div className="rounded-[12px] border-2 border-[#FAC54D]/30 bg-[#FAC54D]/5 p-4 flex items-center justify-between">
+              <div className="rounded-[12px] border border-[#FAC54D]/20 bg-[#FAC54D]/5 p-4 flex items-center justify-between shadow-sm">
                 <span className="text-xs font-bold text-[#b58b29]">Next Scheduled Follow-up:</span>
-                <span className="text-xs font-extrabold text-gray-900">
+                <span className="text-xs font-bold text-gray-900">
                   {new Date(selectedFollowUp.next_follow_up_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>

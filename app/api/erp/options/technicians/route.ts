@@ -36,7 +36,7 @@ export async function GET() {
     const { data: devices, error: deviceError } = await supabase
       .from("devices")
       .select("technician_id")
-      .eq("custody_status", "technician_hands")
+      .in("custody_status", ["technician_hands", "received_by_technician", "on_the_way"])
       .in("technician_id", ids);
 
     if (deviceError) {

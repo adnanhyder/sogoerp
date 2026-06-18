@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { CreateConfig } from "@/lib/create-config";
 import { LoadingSpinner } from "./loading-spinner";
@@ -9,6 +9,7 @@ import { VehicleSelector } from "./vehicle-selector";
 
 type CreateRecordFormProps = {
   config: CreateConfig;
+  onSuccess?: () => void;
 };
 
 type TechnicianOption = {
@@ -25,8 +26,9 @@ type CustomerOption = {
   name: string;
 };
 
-export function CreateRecordForm({ config }: CreateRecordFormProps) {
+export function CreateRecordForm({ config, onSuccess }: CreateRecordFormProps) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -89,6 +91,7 @@ export function CreateRecordForm({ config }: CreateRecordFormProps) {
   }, [needsCustomers]);
 
   async function handleSubmit(formData: FormData) {
+    if (loading) return; // Prevent double submission
     setError("");
     setSuccess("");
     setLoading(true);
@@ -151,6 +154,10 @@ export function CreateRecordForm({ config }: CreateRecordFormProps) {
     }
 
     setSuccess("Record saved.");
+    formRef.current?.reset();
+    if (onSuccess) {
+      onSuccess();
+    }
     router.refresh();
   }
 
@@ -160,7 +167,7 @@ export function CreateRecordForm({ config }: CreateRecordFormProps) {
         <h3 className="text-xl font-bold tracking-tight text-gray-900">Create New Record</h3>
         <p className="mt-1 text-sm text-gray-500">Fill in the details below to add a new entry to the system.</p>
       </div>
-      <form action={handleSubmit} className="grid gap-x-8 gap-y-8 md:grid-cols-2">
+      <form ref={formRef} action={handleSubmit} className="grid gap-x-8 gap-y-8 md:grid-cols-2">
       {config.fields.map((field, index) => (
         <label 
           className="group relative block animate-[slideUpFade_0.6s_ease-out_both]" 

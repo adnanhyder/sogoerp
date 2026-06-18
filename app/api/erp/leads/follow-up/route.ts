@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from("lead_follow_ups")
-    .select("id,reason,notes,next_follow_up_at,seen,created_at")
+    .select("id,reason,notes,next_follow_up_at,seen,created_at,screenshot_url")
     .eq("lead_id", leadId)
     .order("created_at", { ascending: false });
 
@@ -41,9 +41,10 @@ export async function POST(request: Request) {
     reason?: string;
     notes?: string;
     nextFollowUpAt?: string;
+    screenshotUrl?: string;
   };
 
-  const { leadId, reason, notes, nextFollowUpAt } = body;
+  const { leadId, reason, notes, nextFollowUpAt, screenshotUrl } = body;
 
   if (!leadId) {
     return NextResponse.json({ error: "Lead ID is required." }, { status: 400 });
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
     reason,
     notes: notes ?? "",
     next_follow_up_at: nextFollowUpAt,
+    screenshot_url: screenshotUrl ?? null,
     seen: false,
     organization_id: context.organizationId,
   } as any;
