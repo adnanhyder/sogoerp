@@ -12,6 +12,8 @@ import { getDashboardData } from "@/lib/erp-queries";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 const statIcons = [Activity, ClipboardList, Car, CalendarDays];
 const adminFlowHrefs = ["/inventory", "/leads", "/technicians", "/customers"];
 const adminFlowModules = adminFlowHrefs
@@ -98,8 +100,7 @@ export default async function DashboardPage() {
     .order("next_follow_up_at", { ascending: true });
 
   const activeFollowUps = (followUpsData ?? []).filter((fu: any) => {
-    const stage = fu.leads?.stage;
-    return stage !== "won" && stage !== "installed";
+    return true; // We now handle converted stages by redirecting to Customers
   });
 
   return (

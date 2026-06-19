@@ -1,11 +1,15 @@
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ErpShell } from "@/app/_components/erp-shell";
-import { Search } from "lucide-react";
+import { ReceivedFilters } from "./received-filters";
+
+export const dynamic = "force-dynamic";
 
 type ReceivedPageProps = {
   searchParams?: Promise<{
     q?: string;
+    condition?: string;
+    technician_id?: string;
   }>;
 };
 
@@ -14,6 +18,8 @@ export default async function ReceivedPage({ searchParams }: ReceivedPageProps) 
   const supabase = await createClient();
   const params = await searchParams;
   const q = params?.q?.trim() ?? "";
+  const condition = params?.condition?.trim() ?? "";
+  const technicianId = params?.technician_id?.trim() ?? "";
 
   // Fetch all devices that have custody_status = 'received_by_technician'
   const { data: allReceived, error } = await supabase
@@ -58,8 +64,33 @@ export default async function ReceivedPage({ searchParams }: ReceivedPageProps) 
     }
   }
 
-  // Filter devices by search term if provided
+  // Calculate unique technicians for the filter dropdown
+  const technicianMap = new Map<string, string>();
+  for (const d of allReceived ?? []) {
+    if (d.technician_id) {
+      const techObj = Array.isArray(d.technicians) ? d.technicians[0] : d.technicians;
+      const techName = techObj?.name || "Unknown Technician";
+      technicianMap.set(d.technician_id, techName);
+    }
+  }
+  const uniqueTechniciansList = Array.from(technicianMap.entries()).map(([id, name]) => ({
+    id,
+    name,
+  })).sort((a, b) => a.name.localeCompare(b.name));
+
+  // Filter devices by parameters if provided
   let filteredDevices = allReceived ?? [];
+
+  if (condition) {
+    filteredDevices = filteredDevices.filter(
+      (d) => (d.device_condition || "").toLowerCase() === condition.toLowerCase()
+    );
+  }
+
+  if (technicianId) {
+    filteredDevices = filteredDevices.filter((d) => d.technician_id === technicianId);
+  }
+
   if (q) {
     const searchLower = q.toLowerCase();
     filteredDevices = filteredDevices.filter((d) => {
@@ -101,19 +132,13 @@ export default async function ReceivedPage({ searchParams }: ReceivedPageProps) 
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <form className="relative flex flex-1 max-w-md items-center" method="GET">
-          <input
-            type="text"
-            name="q"
-            defaultValue={q}
-            placeholder="Search IMEI, technician name, or city..."
-            className="w-full rounded-[10px] border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm font-medium text-black outline-none transition placeholder:text-gray-400 focus:border-black"
-          />
-          <Search className="absolute left-3 size-4 text-gray-400" strokeWidth={2.2} />
-        </form>
-      </div>
+      {/* Search & Filters */}
+      <ReceivedFilters
+        initialQ={q}
+        initialCondition={condition}
+        initialTechnicianId={technicianId}
+        technicianOptions={uniqueTechniciansList}
+      />
 
       {/* Table Section */}
       <div className="overflow-x-auto rounded-[16px] border border-gray-100 bg-white shadow-sm ring-1 ring-gray-100/50">

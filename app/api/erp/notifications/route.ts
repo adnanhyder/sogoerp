@@ -13,6 +13,7 @@ type NotificationEvent = Omit<ActivityEvent, "event_type"> & {
   event_type: ActivityEvent["event_type"] | "hard" | "followup";
   lead_name?: string;
   lead_id?: string;
+  stage?: string;
 };
 
 const moduleHrefs: Record<string, string> = {
@@ -85,7 +86,7 @@ export async function GET() {
   const oneDayAhead = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const { data: followUps, error: followUpsError } = await supabase
     .from("lead_follow_ups")
-    .select("id,reason,next_follow_up_at,lead_id,leads(name)")
+    .select("id,reason,next_follow_up_at,lead_id,leads(name,stage)")
     .lte("next_follow_up_at", oneDayAhead)
     .eq("seen", false)
     .order("next_follow_up_at", { ascending: true })
@@ -95,8 +96,11 @@ export async function GET() {
     return NextResponse.json({ error: followUpsError.message }, { status: 400 });
   }
 
-  const followUpEvents: NotificationEvent[] = ((followUps ?? []) as Record<string, unknown>[]).map((fu) => {
-    const leadObj = (fu.leads || {}) as Record<string, unknown>;
+  const followUpEvents: NotificationEvent[] = ((followUps ?? []) as Record<string, unknown>[])
+    .filter((fu) => true) // Keep all followups, handle routing dynamically below
+    .map((fu) => {
+      const leadObj = (fu.leads || {}) as Record<string, unknown>;
+      const stage = String(leadObj.stage ?? "");
     const leadName = String(leadObj.name ?? "Lead");
     return {
       created_at: String(fu.next_follow_up_at ?? ""),
@@ -106,6 +110,7 @@ export async function GET() {
       record_label: `Follow-up due: ${leadName} - ${fu.reason}`,
       lead_id: String(fu.lead_id ?? ""),
       lead_name: leadName,
+      stage,
     };
   });
 
@@ -189,7 +194,13 @@ export async function GET() {
         message = event.record_label;
         const leadName = event.lead_name ?? "";
         const leadId = event.lead_id ?? "";
-        href = `/leads?q=${encodeURIComponent(leadName)}&openFollowUps=${leadId}`;
+        const stage = event.stage ?? "";
+        
+        if (stage === "installation_scheduled" || stage === "installed" || stage === "won") {
+          href = `/customers?q=${encodeURIComponent(leadName)}`;
+        } else {
+          href = `/leads?q=${encodeURIComponent(leadName)}&openFollowUps=${leadId}`;
+        }
       } else if (event.event_type === "hard") {
         message = event.record_label;
       }

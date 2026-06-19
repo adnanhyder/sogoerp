@@ -11,7 +11,7 @@ export const moduleConfigs = {
       { label: "In Transit", value: "38", detail: "Courier / technician handoff" },
       { label: "Faulty", value: "17", detail: "Pending replacement" },
     ],
-    tableColumns: ["IMEI", "Device Status", "Custody", "Mic", "Technician", "Target Customer", "City", "Tech Devices", "Purchase Cost", "Added At", "Actions"],
+    tableColumns: ["IMEI", "Device Status", "Custody", "Mic", "Technician", "Target Customer", "City", "Tech Devices", "Purchase Cost", "Added At", "Consignment", "Courier", "Actions"],
     tableRows: [
       ["865742091234567", "IMEI Approved", "Unassigned", "-", "-"],
       ["865742091234611", "With Technician", "Hamza Field", "-", "-"],

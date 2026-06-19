@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X, Search, UserCheck, ShieldAlert, Award } from "lucide-react";
+import { AlertModal } from "@/app/_components/alert-modal";
 
 type CompletedCustomersTableProps = {
   columns: readonly string[];
@@ -11,6 +12,45 @@ type CompletedCustomersTableProps = {
 export function CompletedCustomersTable({ columns, rows }: CompletedCustomersTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<readonly string[] | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteTargetRow, setDeleteTargetRow] = useState<readonly string[] | null>(null);
+
+  const handleDeleteCustomer = (row: readonly string[]) => {
+    setDeleteTargetRow(row);
+    setIsDeleteModalOpen(true);
+  };
+
+  const executeDeleteCustomer = async () => {
+    if (!deleteTargetRow) return;
+    setIsDeleting(true);
+    try {
+      const response = await fetch("/api/erp/delete", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: deleteTargetRow[0],
+          moduleKey: "customers",
+        }),
+      });
+
+      const res = await response.json();
+      if (!response.ok) {
+        throw new Error(res.error || "Failed to delete customer.");
+      }
+
+      setIsDeleteModalOpen(false);
+      setDeleteTargetRow(null);
+      setSelectedCustomer(null);
+      window.location.reload();
+    } catch (err: any) {
+      alert(err.message || "An error occurred while deleting the customer.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (!rows.length) return null;
 
@@ -75,46 +115,54 @@ export function CompletedCustomersTable({ columns, rows }: CompletedCustomersTab
           <table className="w-full text-left text-sm border-collapse min-w-[1250px]">
             <thead className="bg-[#fbfbfb] text-gray-500 uppercase text-[10px] tracking-wider font-extrabold border-b border-gray-100">
               <tr>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Customer</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Phone</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Location/City</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Vehicle</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Assigned Device</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Technician</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Installed On</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] text-center w-32">Actions</th>
+                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] whitespace-nowrap">Customer</th>
+                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] whitespace-nowrap">Phone</th>
+                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] whitespace-nowrap">Location/City</th>
+                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] whitespace-nowrap">Vehicle</th>
+                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] whitespace-nowrap">Assigned Device</th>
+                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] whitespace-nowrap">Technician</th>
+                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] whitespace-nowrap">Installed On</th>
+                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] text-center w-32 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredRows.map((row) => (
                 <tr key={row[0]} className="hover:bg-[#fbfbfb]/80 transition-colors">
-                  <td className="px-6 py-4.5">
+                  <td className="px-6 py-4.5 whitespace-nowrap">
                     <span className="font-bold text-black">{row[1]}</span>
                   </td>
-                  <td className="px-6 py-4.5 text-xs font-semibold text-gray-600">{row[2]}</td>
-                  <td className="px-6 py-4.5 text-xs font-semibold text-gray-500">{row[7]}</td>
-                  <td className="px-6 py-4.5">
-                    <span className="text-xs font-semibold text-gray-700 bg-gray-50 px-2.5 py-1 rounded-[6px] border border-gray-100 inline-block">
+                  <td className="px-6 py-4.5 text-xs font-semibold text-gray-600 whitespace-nowrap">{row[2]}</td>
+                  <td className="px-6 py-4.5 text-xs font-semibold text-gray-500 whitespace-nowrap">{row[7]}</td>
+                  <td className="px-6 py-4.5 whitespace-nowrap">
+                    <span className="text-xs font-semibold text-gray-700 bg-gray-50 px-2.5 py-1 rounded-[6px] border border-gray-100 inline-block whitespace-nowrap">
                       {row[8]}
                     </span>
                   </td>
-                  <td className="px-6 py-4.5">
+                  <td className="px-6 py-4.5 whitespace-nowrap">
                     <span className="text-xs font-bold text-black tabular-nums">{row[16]}</span>
                   </td>
-                  <td className="px-6 py-4.5 text-xs font-semibold text-gray-600">
+                  <td className="px-6 py-4.5 text-xs font-semibold text-gray-600 whitespace-nowrap">
                     👷 {row[19] || "Unassigned"}
                   </td>
-                  <td className="px-6 py-4.5 text-xs font-semibold text-gray-500">
+                  <td className="px-6 py-4.5 text-xs font-semibold text-gray-500 whitespace-nowrap">
                     {row[20] || "—"}
                   </td>
-                  <td className="px-6 py-4.5 text-center">
+                  <td className="px-6 py-4.5 text-center flex items-center justify-center gap-2 whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => setSelectedCustomer(row)}
-                      className="inline-flex items-center gap-1 rounded-[6px] bg-green-50 border border-green-200 px-2.5 py-1.5 text-[10px] font-bold text-green-700 hover:bg-green-100 transition-colors shadow-sm"
+                      className="inline-flex items-center gap-1 rounded-[6px] bg-green-50 border border-green-200 px-2.5 py-1.5 text-[10px] font-bold text-green-700 hover:bg-green-100 transition-colors shadow-sm cursor-pointer whitespace-nowrap"
                     >
                       <Search className="size-3" />
-                      View Report
+                      View
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCustomer(row)}
+                      disabled={isDeleting}
+                      className="inline-flex items-center gap-1 rounded-[6px] bg-red-50 border border-red-200 px-2.5 py-1.5 text-[10px] font-bold text-red-700 hover:bg-red-100 transition-colors shadow-sm cursor-pointer whitespace-nowrap"
+                    >
+                      Delete
                     </button>
                   </td>
                 </tr>
@@ -168,8 +216,17 @@ export function CompletedCustomersTable({ columns, rows }: CompletedCustomersTab
               </div>
             </div>
             
-            <div className="border-t border-[#eeeeee] bg-[#fbfbfb] px-6 py-4 flex justify-end">
+            <div className="border-t border-[#eeeeee] bg-[#fbfbfb] px-6 py-4 flex justify-between items-center">
               <button
+                type="button"
+                onClick={() => handleDeleteCustomer(selectedCustomer)}
+                disabled={isDeleting}
+                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[8px] border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {isDeleting ? "Deleting..." : "Delete Customer"}
+              </button>
+              <button
+                type="button"
                 onClick={() => setSelectedCustomer(null)}
                 className="inline-flex h-10 items-center justify-center rounded-[8px] bg-black px-6 text-sm font-bold text-white transition hover:bg-[#343434]"
               >
@@ -179,6 +236,32 @@ export function CompletedCustomersTable({ columns, rows }: CompletedCustomersTab
           </div>
         </div>
       )}
+
+      <AlertModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeleteTargetRow(null);
+        }}
+        onConfirm={executeDeleteCustomer}
+        title="Delete Customer"
+        description={
+          deleteTargetRow ? (
+            <>
+              Are you sure you want to delete customer{" "}
+              <strong className="text-gray-900">{deleteTargetRow[1]}</strong>?
+              This will also delete their vehicles, work orders, meetings,
+              insurance policies, and completely delete their successfully
+              installed device from the database.
+            </>
+          ) : (
+            ""
+          )
+        }
+        confirmText="Delete"
+        type="delete"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

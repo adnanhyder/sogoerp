@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { CreateConfig } from "@/lib/create-config";
 import { LoadingSpinner } from "./loading-spinner";
@@ -90,12 +90,14 @@ export function CreateRecordForm({ config, onSuccess }: CreateRecordFormProps) {
     };
   }, [needsCustomers]);
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     if (loading) return; // Prevent double submission
     setError("");
     setSuccess("");
     setLoading(true);
 
+    const formData = new FormData(e.currentTarget);
     let screenshotUrl = "";
 
     if (screenshotFile && config.moduleKey === "leads" && selectedStage !== "new_lead") {
@@ -150,6 +152,7 @@ export function CreateRecordForm({ config, onSuccess }: CreateRecordFormProps) {
 
     if (!response.ok || result.error) {
       setError(result.error ?? "Unable to create record.");
+      // Do NOT reset the form — keep all filled values so the user can correct only what's wrong
       return;
     }
 
@@ -167,7 +170,7 @@ export function CreateRecordForm({ config, onSuccess }: CreateRecordFormProps) {
         <h3 className="text-xl font-bold tracking-tight text-gray-900">Create New Record</h3>
         <p className="mt-1 text-sm text-gray-500">Fill in the details below to add a new entry to the system.</p>
       </div>
-      <form ref={formRef} action={handleSubmit} className="grid gap-x-8 gap-y-8 md:grid-cols-2">
+      <form ref={formRef} onSubmit={handleSubmit} className="grid gap-x-8 gap-y-8 md:grid-cols-2">
       {config.fields.map((field, index) => (
         <label 
           className="group relative block animate-[slideUpFade_0.6s_ease-out_both]" 

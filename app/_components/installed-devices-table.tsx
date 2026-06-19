@@ -104,15 +104,15 @@ export function InstalledDevicesTable({ columns, rows }: InstalledDevicesTablePr
         <table className="w-full text-left text-sm border-collapse min-w-[1250px]">
           <thead className="bg-[#fbfbfb] text-gray-500 uppercase text-[10px] tracking-wider font-extrabold border-b border-gray-100">
             <tr>
-              <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Device #</th>
-              <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Customer Name</th>
-              <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">City</th>
-              <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Technician</th>
-              <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">IMEI</th>
-              <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Purchase Cost</th>
-              <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Sale Price</th>
-              <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Installation Date</th>
-              <th className="px-6 py-4 font-extrabold text-[#7a7a7a] text-center w-32">Actions</th>
+              <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a]">Device #</th>
+              <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a]">Customer Name</th>
+              <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a]">City</th>
+              <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a]">Technician</th>
+              <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a]">IMEI</th>
+              <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a]">Purchase Cost</th>
+              <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a]">Sale Price</th>
+              <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a]">Installation Date</th>
+              <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a] text-center w-32">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -120,15 +120,15 @@ export function InstalledDevicesTable({ columns, rows }: InstalledDevicesTablePr
               const deviceNo = String(rows.length - idx).padStart(2, "0");
               return (
                 <tr className="hover:bg-[#fbfbfb]/80 transition-colors" key={row[0]}>
-                  <td className="px-6 py-4.5 align-middle text-sm font-bold text-black">{deviceNo}</td>
-                  <td className="px-6 py-4.5 align-middle text-sm font-bold text-gray-900">{row[9] !== "-" ? row[9] : "—"}</td>
-                  <td className="px-6 py-4.5 align-middle text-sm font-semibold text-gray-500">{row[16] !== "-" ? row[16] : "—"}</td>
-                  <td className="px-6 py-4.5 align-middle text-sm font-semibold text-gray-600">👷 {row[8] !== "-" ? row[8] : "—"}</td>
-                  <td className="px-6 py-4.5 align-middle text-sm font-bold text-black tabular-nums">{row[4]}</td>
-                  <td className="px-6 py-4.5 align-middle text-sm font-semibold text-green-700">Rs. {Number(row[12] || 0).toLocaleString()}</td>
-                  <td className="px-6 py-4.5 align-middle text-sm font-semibold text-green-700">Rs. {Number(row[17] || 0).toLocaleString()}</td>
-                  <td className="px-6 py-4.5 align-middle text-sm font-semibold text-gray-500">{row[18] !== "-" ? row[18] : "—"}</td>
-                  <td className="px-6 py-4.5 align-middle text-center">
+                  <td className="whitespace-nowrap px-6 py-4.5 align-middle text-sm font-bold text-black">{deviceNo}</td>
+                  <td className="whitespace-nowrap px-6 py-4.5 align-middle text-sm font-bold text-gray-900">{row[9] !== "-" ? row[9] : "—"}</td>
+                  <td className="whitespace-nowrap px-6 py-4.5 align-middle text-sm font-semibold text-gray-500">{row[16] !== "-" ? row[16] : "—"}</td>
+                  <td className="whitespace-nowrap px-6 py-4.5 align-middle text-sm font-semibold text-gray-600">👷 {row[8] !== "-" ? row[8] : "—"}</td>
+                  <td className="whitespace-nowrap px-6 py-4.5 align-middle text-sm font-bold text-black tabular-nums">{row[4]}</td>
+                  <td className="whitespace-nowrap px-6 py-4.5 align-middle text-sm font-semibold text-green-700">Rs. {Number(row[12] || 0).toLocaleString()}</td>
+                  <td className="whitespace-nowrap px-6 py-4.5 align-middle text-sm font-semibold text-green-700">Rs. {Number(row[17] || 0).toLocaleString()}</td>
+                  <td className="whitespace-nowrap px-6 py-4.5 align-middle text-sm font-semibold text-gray-500">{row[18] !== "-" ? row[18] : "—"}</td>
+                  <td className="whitespace-nowrap px-6 py-4.5 align-middle text-center">
                     <button
                       onClick={() => setSelectedDevice({ row, deviceNo })}
                       className="inline-flex h-8 items-center justify-center gap-1.5 rounded-[6px] bg-green-50 border border-green-200 px-3 text-[10px] font-bold text-green-700 transition hover:bg-green-100 shadow-sm"

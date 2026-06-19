@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { erpModules } from "@/lib/erp-data";
 import { BrandLogo } from "./brand-logo";
@@ -50,6 +54,13 @@ export function ErpShell({
     .slice(0, 2)
     .toUpperCase();
 
+  const [isReportsOpen, setIsReportsOpen] = useState(() => {
+    return (
+      activeHref.startsWith("/inventory/") &&
+      ["/inventory/in-stock", "/inventory/on-way", "/inventory/received", "/inventory/installed"].includes(activeHref)
+    );
+  });
+
   return (
     <main className="min-h-screen bg-white">
       <section className="flex min-h-screen w-full bg-white">
@@ -67,7 +78,7 @@ export function ErpShell({
 
                 const isInventoryReportActive =
                   activeHref.startsWith("/inventory/") &&
-                  ["/inventory/in-stock", "/inventory/on-way", "/inventory/received"].includes(activeHref);
+                  ["/inventory/in-stock", "/inventory/on-way", "/inventory/received", "/inventory/installed"].includes(activeHref);
 
                 return (
                   <div key={item.href} className="flex flex-col">
@@ -88,26 +99,35 @@ export function ErpShell({
 
                     {item.href === "/inventory" && (
                       <div className="flex flex-col">
-                        <Link
-                          className={`relative flex min-h-12 items-center gap-4 px-8 py-3 text-sm transition ${
+                        <button
+                          type="button"
+                          onClick={() => setIsReportsOpen(!isReportsOpen)}
+                          className={`relative flex min-h-12 w-full items-center justify-between px-8 py-3 text-sm transition cursor-pointer text-left ${
                             isInventoryReportActive
                               ? "bg-black font-semibold text-white"
                               : "text-[#777777] hover:bg-[#fbfbfb] hover:text-black"
                           }`}
-                          href="/inventory/in-stock"
                         >
-                          {isInventoryReportActive ? (
-                            <span className="absolute left-2.5 h-6 w-1 rounded-full bg-white" />
-                          ) : null}
-                          <Icon className="size-[19px] shrink-0" strokeWidth={1.8} />
-                          <span>Inventory Reports</span>
-                        </Link>
-                        {isInventoryReportActive && (
+                          <div className="flex items-center gap-4">
+                            {isInventoryReportActive ? (
+                              <span className="absolute left-2.5 h-6 w-1 rounded-full bg-white" />
+                            ) : null}
+                            <Icon className="size-[19px] shrink-0" strokeWidth={1.8} />
+                            <span>Inventory Reports</span>
+                          </div>
+                          <ChevronDown
+                            className={`size-4 shrink-0 transition-transform duration-200 ${
+                              isReportsOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                        {isReportsOpen && (
                           <div className="flex flex-col border-l border-[#d2d2d2] ml-10 my-1 pl-3 gap-1.5">
                             {[
                               { title: "-- Inventory In Stock", href: "/inventory/in-stock" },
                               { title: "-- Inventory On Way", href: "/inventory/on-way" },
                               { title: "-- Inventory Received", href: "/inventory/received" },
+                              { title: "-- Inventory Installed", href: "/inventory/installed" },
                             ].map((sub) => {
                               const subActive = activeHref === sub.href;
                               return (

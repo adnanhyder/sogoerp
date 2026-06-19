@@ -88,8 +88,6 @@ export const createConfigs = {
         required: true,
         type: "select",
       },
-      { label: "Courier Company", name: "courier_company", type: "text" },
-      { label: "Consignment Number", name: "consignment_number", type: "text" },
       { label: "Added Date & Time", name: "created_at", type: "datetime-local" },
     ],
   },

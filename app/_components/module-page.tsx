@@ -10,7 +10,7 @@ import { CustomerRecordActions } from "./customer-record-actions";
 import { InventoryRecordActions } from "./inventory-record-actions";
 import { LeadRecordActions } from "./lead-record-actions";
 import { TechnicianRecordActions } from "./technician-record-actions";
-import { InstalledDevicesTable } from "./installed-devices-table";
+
 import { PaidCommissionsTable } from "./paid-commissions-table";
 import { CompletedCustomersTable } from "./completed-customers-table";
 import type { CreateConfig } from "@/lib/create-config";
@@ -90,18 +90,18 @@ export function ModulePage({
       ? tableRows.filter(row => row[14] !== "completed")
       : tableRows;
 
-  const installedDevices = isInventory ? tableRows.filter(row => row[1] === "installed") : [];
+
   const completedCustomers = isCustomers ? tableRows.filter(row => row[14] === "completed") : [];
 
   function renderInventoryCell(cell: string, index: number) {
     if (index === 0) {
-      return <span className="font-bold tracking-[-0.01em] text-black">{cell}</span>;
+      return <span className="font-bold tracking-[-0.01em] text-black whitespace-nowrap">{cell}</span>;
     }
 
     if (index === 1) {
       return (
         <span
-          className={`inline-flex min-h-8 items-center rounded-full border px-3 py-1 text-xs font-bold capitalize ${inventoryChipClass(cell)}`}
+          className={`inline-flex min-h-8 items-center whitespace-nowrap rounded-full border px-3 py-1 text-xs font-bold capitalize ${inventoryChipClass(cell)}`}
         >
           {cell}
         </span>
@@ -111,7 +111,7 @@ export function ModulePage({
     if (index === 2) {
       return (
         <span
-          className={`inline-flex min-h-8 items-center rounded-full border px-3 py-1 text-xs font-bold capitalize ${inventoryChipClass(cell)}`}
+          className={`inline-flex min-h-8 items-center whitespace-nowrap rounded-full border px-3 py-1 text-xs font-bold capitalize ${inventoryChipClass(cell)}`}
         >
           {cell}
         </span>
@@ -123,7 +123,7 @@ export function ModulePage({
 
       return (
         <span
-          className={`inline-flex min-h-8 items-center rounded-full border px-3 py-1 text-xs font-bold ${
+          className={`inline-flex min-h-8 items-center whitespace-nowrap rounded-full border px-3 py-1 text-xs font-bold ${
             hasMic
               ? "border-green-200 bg-green-50 text-green-700"
               : "border-[#d2d2d2] bg-[#fbfbfb] text-[#777777]"
@@ -135,28 +135,36 @@ export function ModulePage({
     }
 
     if (index === 4 || index === 6 || index === 7) {
-      return <span className="font-bold tabular-nums text-black">{cell}</span>;
+      return <span className="font-bold tabular-nums text-black whitespace-nowrap">{cell}</span>;
     }
 
     if (index === 5 || index === 8) {
-      return <span className="text-xs font-semibold text-[#777777]">{cell}</span>;
+      return <span className="text-xs font-semibold text-[#777777] whitespace-nowrap">{cell}</span>;
     }
 
-    return <span>{cell}</span>;
+    if (index === 9) {
+      return <span className="text-xs text-[#777777] whitespace-nowrap">{cell}</span>;
+    }
+
+    if (index === 10 || index === 11) {
+      return <span className="text-xs font-semibold text-black whitespace-nowrap">{cell}</span>;
+    }
+
+    return <span className="whitespace-nowrap">{cell}</span>;
   }
 
   const recordsTable = (
     <div className="overflow-x-auto rounded-[16px] border border-gray-100 bg-white shadow-sm ring-1 ring-gray-100/50">
       <table
         className={`w-full border-collapse text-left text-sm ${
-          isInventory ? "min-w-[1100px]" : isCustomers ? "min-w-[1250px]" : isLeads ? "min-w-[1250px]" : isTechnicians ? "min-w-[1150px]" : isCoreAdmin ? "min-w-[1000px]" : "min-w-[720px]"
+          isInventory ? "min-w-[1550px]" : isCustomers ? "min-w-[1250px]" : isLeads ? "min-w-[1250px]" : isTechnicians ? "min-w-[1150px]" : isCoreAdmin ? "min-w-[1000px]" : "min-w-[720px]"
         }`}
       >
         <thead className="bg-[#fbfbfb] text-gray-500 uppercase text-[10px] tracking-wider font-extrabold border-b border-gray-100">
           <tr>
             {tableColumns.map((column) => (
               <th
-                className="px-6 py-4 font-extrabold text-[#7a7a7a]"
+                className="px-6 py-4 font-extrabold text-[#7a7a7a] whitespace-nowrap"
                 key={column}
               >
                 {column}
@@ -168,7 +176,7 @@ export function ModulePage({
           {mainTableRows.length ? (
             mainTableRows.map((row) => {
               const visibleCells = isInventory
-                ? row.slice(4, 14)
+                ? [...row.slice(4, 14), row[19] || "-", row[20] || "-"]
                 : isTechnicians
                   ? [row[6] ?? "", row[8] ?? "", row[9] ?? "", row[10] ?? "", row[11] ?? "", row[14] ?? "", row[15] ?? ""]
                   : isLeads
@@ -182,7 +190,7 @@ export function ModulePage({
               const inventoryTechnicianId = row[3] ?? "";
               const inventoryImei = row[4] ?? "";
               const inventoryHasMic = row[7] ?? "No";
-              const inventoryPurchaseCost = row[11] ?? "0";
+              const inventoryPurchaseCost = row[12] ?? "0";
               const technicianId = row[0] ?? "";
               const technicianActive = row[1] === "true";
               const technicianDisputed = row[2] === "true";
@@ -196,7 +204,7 @@ export function ModulePage({
                 >
                   {visibleCells.map((cell, index) => (
                     <td
-                      className={`px-6 py-4.5 align-middle text-sm text-gray-700 ${
+                      className={`px-6 py-4.5 align-middle text-sm text-gray-700 whitespace-nowrap ${
                         index === 0 && !isInventory ? "font-bold text-black" : "font-medium"
                       }`}
                       key={`${cell}-${index}`}
@@ -205,7 +213,7 @@ export function ModulePage({
                     </td>
                   ))}
                   {isInventory ? (
-                    <td className="px-6 py-4.5 align-middle">
+                    <td className="px-6 py-4.5 align-middle whitespace-nowrap">
                       <InventoryRecordActions
                         custodyStatus={inventoryCustodyStatus}
                         hasMic={inventoryHasMic === "Yes"}
@@ -216,14 +224,17 @@ export function ModulePage({
                         technicianId={inventoryTechnicianId}
                         consignmentNumber={row[19] ?? ""}
                         courierCompany={row[20] ?? ""}
+                        sentByTechnicianId={row[21] ?? ""}
                       />
                     </td>
                   ) : null}
                   {isLeads ? (
-                    <td className="px-6 py-4.5 align-middle">
+                    <td className="px-6 py-4.5 align-middle whitespace-nowrap">
                       <LeadRecordActions
                         assignedDeviceId={row[15] ?? ""}
                         assignedDeviceImei={row[16] ?? ""}
+                        consignmentNumber={row[17] ?? ""}
+                        courierCompany={row[18] ?? ""}
                         assignedTechnicianId={row[13] ?? ""}
                         assignedTechnicianName={row[14] ?? ""}
                         budget={row[9] ?? "0"}
@@ -240,7 +251,7 @@ export function ModulePage({
                     </td>
                   ) : null}
                   {isCustomers ? (
-                    <td className="px-6 py-4.5 align-middle">
+                    <td className="px-6 py-4.5 align-middle whitespace-nowrap">
                       <CustomerRecordActions
                         customerId={row[0] ?? ""}
                         installStatus={row[14] ?? "none"}
@@ -253,7 +264,7 @@ export function ModulePage({
                     </td>
                   ) : null}
                   {isTechnicians ? (
-                    <td className="px-6 py-4.5 align-middle">
+                    <td className="px-6 py-4.5 align-middle whitespace-nowrap">
                       <TechnicianRecordActions
                         active={technicianActive}
                         authorizationPersonCnic={technicianAuthCnic}
@@ -279,7 +290,7 @@ export function ModulePage({
           ) : (
             <tr className="border-t border-[#eeeeee]">
               <td
-                className="px-4 py-12 text-center text-sm font-semibold text-[#777777]"
+                className="px-6 py-12 text-center text-sm font-semibold text-gray-400 whitespace-nowrap"
                 colSpan={tableColumns.length}
               >
                 <span className="mx-auto block max-w-sm rounded-[8px] border border-dashed border-[#d2d2d2] bg-[#fbfbfb] px-5 py-6">
@@ -317,9 +328,7 @@ export function ModulePage({
             </AdminRecordsPanel>
           </article>
 
-          {isInventory && installedDevices.length > 0 ? (
-            <InstalledDevicesTable columns={tableColumns} rows={installedDevices} />
-          ) : null}
+
 
           {isTechnicians && (
             <PaidCommissionsTable />
@@ -446,9 +455,7 @@ export function ModulePage({
         </section>
       </div>
 
-      {isInventory && installedDevices.length > 0 ? (
-        <InstalledDevicesTable columns={tableColumns} rows={installedDevices} />
-      ) : null}
+
     </ErpShell>
   );
 }

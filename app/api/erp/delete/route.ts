@@ -48,10 +48,32 @@ export async function DELETE(request: Request) {
   }
 
   if (moduleKey === "customers") {
-    // Unassign devices from this customer
+    // Fetch all work orders associated with this customer first
+    const { data: workOrders } = await supabase
+      .from("work_orders")
+      .select("id")
+      .eq("customer_id", body.id);
+    
+    const workOrderIds = workOrders?.map((w) => w.id) ?? [];
+
+    // Delete finance entries associated with this customer
+    await supabase
+      .from("finance_entries")
+      .delete()
+      .eq("related_customer_id", body.id);
+
+    // Delete finance entries and commissions associated with the customer's work orders
+    if (workOrderIds.length > 0) {
+      await Promise.all([
+        supabase.from("finance_entries").delete().in("related_work_order_id", workOrderIds),
+        supabase.from("commissions").delete().in("work_order_id", workOrderIds),
+      ]);
+    }
+
+    // Delete any devices associated with this customer completely
     await supabase
       .from("devices")
-      .update({ custody_status: "company_hands", customer_id: null, status: "clear", vehicle_id: null })
+      .delete()
       .eq("customer_id", body.id);
 
     // Delete dependent records
@@ -61,6 +83,60 @@ export async function DELETE(request: Request) {
       supabase.from("customer_meetings").delete().eq("customer_id", body.id),
       supabase.from("insurance_policies").delete().eq("customer_id", body.id),
     ]);
+
+    // Delete the source lead if exists
+    if (record.source_lead_id) {
+      await supabase.from("leads").delete().eq("id", record.source_lead_id);
+    }
+  }
+
+  if (moduleKey === "inventory" && record.status === "installed" && record.customer_id) {
+    const customerId = record.customer_id;
+
+    // Fetch the customer first to get the source_lead_id
+    const { data: customerRecord } = await supabase
+      .from("customers")
+      .select("source_lead_id")
+      .eq("id", customerId)
+      .single();
+
+    // Fetch all work orders associated with this customer first
+    const { data: workOrders } = await supabase
+      .from("work_orders")
+      .select("id")
+      .eq("customer_id", customerId);
+    
+    const workOrderIds = workOrders?.map((w) => w.id) ?? [];
+
+    // Delete finance entries associated with this customer
+    await supabase
+      .from("finance_entries")
+      .delete()
+      .eq("related_customer_id", customerId);
+
+    // Delete finance entries and commissions associated with the customer's work orders
+    if (workOrderIds.length > 0) {
+      await Promise.all([
+        supabase.from("finance_entries").delete().in("related_work_order_id", workOrderIds),
+        supabase.from("commissions").delete().in("work_order_id", workOrderIds),
+      ]);
+    }
+
+    // Delete dependent records for the customer
+    await Promise.all([
+      supabase.from("vehicles").delete().eq("customer_id", customerId),
+      supabase.from("work_orders").delete().eq("customer_id", customerId),
+      supabase.from("customer_meetings").delete().eq("customer_id", customerId),
+      supabase.from("insurance_policies").delete().eq("customer_id", customerId),
+    ]);
+
+    // Delete the customer
+    await supabase.from("customers").delete().eq("id", customerId);
+
+    // Delete the source lead if exists
+    if (customerRecord?.source_lead_id) {
+      await supabase.from("leads").delete().eq("id", customerRecord.source_lead_id);
+    }
   }
 
   const { error } = await supabase.from(config.table).delete().eq("id", body.id);

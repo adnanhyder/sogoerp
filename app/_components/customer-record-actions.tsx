@@ -292,18 +292,16 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
         </button>
       )}
 
-      {installStatus !== "completed" ? (
-        <button
-          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition hover:border-red-500 disabled:cursor-wait disabled:opacity-50"
-          disabled={loading}
-          onClick={() => setIsDeleteModalOpen(true)}
-          title={`Delete ${name}`}
-          type="button"
-        >
-          <Trash className="size-3" />
-          Delete
-        </button>
-      ) : null}
+      <button
+        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition hover:border-red-500 disabled:cursor-wait disabled:opacity-50"
+        disabled={loading}
+        onClick={() => setIsDeleteModalOpen(true)}
+        title={`Delete ${name}`}
+        type="button"
+      >
+        <Trash className="size-3" />
+        Delete
+      </button>
 
       {isInstallOpen ? (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
@@ -622,7 +620,7 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
           deleteCustomer();
         }}
         title="Delete Customer"
-        description={`Are you sure you want to permanently delete ${name}? This will also remove their vehicles, work orders, meetings, and insurance policies. Any installed devices will be returned to inventory.`}
+        description={`Are you sure you want to permanently delete ${name}? This will also remove their vehicles, work orders, meetings, insurance policies, and completely delete their successfully installed device from the database.`}
         confirmText="Delete"
         type="delete"
         isLoading={loading}

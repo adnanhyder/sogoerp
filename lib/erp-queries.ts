@@ -45,9 +45,7 @@ export type ModuleData = {
 };
 
 const moneyFormatter = new Intl.NumberFormat("en-US", {
-  currency: "USD",
   maximumFractionDigits: 0,
-  style: "currency",
 });
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -67,7 +65,7 @@ function formatCount(value: number | null | undefined) {
 }
 
 function formatMoney(value: number) {
-  return moneyFormatter.format(value);
+  return `Rs. ${moneyFormatter.format(value)}`;
 }
 
 function formatDate(value: string | null | undefined) {
@@ -219,7 +217,7 @@ export async function getDashboardData(
       supabase.from("devices").select("status, custody_status, purchase_cost, installation_date"),
       supabase.from("work_orders").select("id, status, scheduled_at, completed_at, before_image_url, after_image_url, created_at, customers(full_name), devices(imei)"),
       supabase.from("support_tickets").select("status"),
-      supabase.from("leads").select("stage"),
+      supabase.from("leads").select("stage, created_at"),
       supabase.from("vehicles").select("id", { count: "exact", head: true }),
       supabase.from("finance_entries").select("amount, entry_type").gte("occurred_on", monthStart),
       supabase.from("commissions").select("amount").gte("created_at", monthStart),
@@ -322,32 +320,28 @@ export async function getDashboardData(
     const totalExpenses = monthlyExpenses + monthlyDevicePurchaseCost + monthlyTechnicianCommissions;
     const netProfit = monthlyIncome - totalExpenses;
 
+    const last8Days = Array.from({ length: 8 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (7 - i));
+      return d.toISOString().slice(0, 10);
+    });
+
+    const primaryActivity = last8Days.map(date => {
+      return workOrders.filter(w => w.status === "completed" && w.completed_at && String(w.completed_at).startsWith(date)).length;
+    });
+
+    const secondaryActivity = last8Days.map(date => {
+      return leads.filter(l => l.created_at && String(l.created_at).startsWith(date)).length;
+    });
+
     return {
       data: {
         bars: leadStages.map((count) =>
           totalLeads ? Math.max(6, Math.round((count / totalLeads) * 100)) : 0,
         ),
         chartSeries: {
-          primary: [
-            purchasedDevices,
-            approvedDevices,
-            techDevices,
-            pendingInstalls,
-            assignedToday,
-            completedToday,
-            installedDevices,
-            activeDevices,
-          ],
-          secondary: [
-            totalLeads,
-            leadStages[0] ?? 0,
-            leadStages[1] ?? 0,
-            leadStages[2] ?? 0,
-            leadStages[3] ?? 0,
-            leadStages[4] ?? 0,
-            openTickets,
-            totalVehicles,
-          ],
+          primary: primaryActivity,
+          secondary: secondaryActivity,
         },
         kpis: [
           {
@@ -598,7 +592,7 @@ export async function getModuleData(
       error:
         error instanceof Error
           ? error.message
-          : "Unable to load module data from Supabase.",
+          : JSON.stringify(error),
     };
   }
 }
@@ -615,27 +609,42 @@ function displayDeviceStatus(value: unknown) {
 }
 
 async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
-  let query = supabase
-    .from("devices")
-    .select("id,imei,status,custody_status,has_mic,purchase_cost,sale_price,installation_date,created_at,technician_id,technicians(name,phone,cities),customer_id,customers(full_name,phone,location),consignment_number,courier_company")
-    .order("created_at", { ascending: false });
-
   const trimmedSearch = searchQuery.trim();
 
-  if (trimmedSearch) {
-    const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
-    query = query.or(
-      `imei.ilike.%${escapedSearch}%,status.ilike.%${escapedSearch}%,custody_status.ilike.%${escapedSearch}%`,
-    );
+  const buildQuery = (withSentBy: boolean) => {
+    const selectFields = withSentBy
+      ? "id,imei,status,custody_status,has_mic,purchase_cost,sale_price,installation_date,created_at,technician_id,technicians(name,phone,cities),customer_id,customers(full_name,phone,location),consignment_number,courier_company,sent_by_technician_id,sent_by:technicians!devices_sent_by_technician_id_fkey(name)"
+      : "id,imei,status,custody_status,has_mic,purchase_cost,sale_price,installation_date,created_at,technician_id,technicians(name,phone,cities),customer_id,customers(full_name,phone,location),consignment_number,courier_company";
+
+    let q = supabase
+      .from("devices")
+      .select(selectFields)
+      .order("created_at", { ascending: false });
+
+    if (trimmedSearch) {
+      const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
+      q = q.or(`imei.ilike.%${escapedSearch}%`);
+    }
+
+    return q.limit(trimmedSearch ? 50 : 10);
+  };
+
+  // Try full query with sent_by join; fall back if column doesn't exist yet
+  let data: Record<string, unknown>[] | null = null;
+  let hasSentBy = true;
+
+  const fullResult = await buildQuery(true);
+  if (fullResult.error) {
+    // Column may not exist yet — fall back to query without it
+    hasSentBy = false;
+    const fallbackResult = await buildQuery(false);
+    if (fallbackResult.error) throw fallbackResult.error;
+    data = (fallbackResult.data as unknown as Record<string, unknown>[]) ?? [];
+  } else {
+    data = (fullResult.data as unknown as Record<string, unknown>[]) ?? [];
   }
 
-  const { data, error } = await query.limit(trimmedSearch ? 50 : 10);
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = (data ?? []) as Record<string, unknown>[];
+  const rows = data;
   const technicianIds = Array.from(
     new Set(
       rows
@@ -647,6 +656,9 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
 
   return rows.map((row) => {
     const technicianId = typeof row.technician_id === "string" ? row.technician_id : "";
+    const sentByTechId = hasSentBy && typeof row.sent_by_technician_id === "string" ? row.sent_by_technician_id : "";
+    const sentByRaw = hasSentBy ? row.sent_by as Record<string, unknown> | null : null;
+    const sentByName = sentByRaw && typeof sentByRaw.name === "string" ? sentByRaw.name : "";
 
     return [
       String(row.id ?? ""), // 0
@@ -670,9 +682,12 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
       row.installation_date ? formatDate(String(row.installation_date)) : "-", // 18: installation date
       String(row.consignment_number ?? ""), // 19
       String(row.courier_company ?? ""), // 20
+      sentByTechId, // 21: sent_by_technician_id
+      sentByName, // 22: sent_by technician name
     ];
   });
 }
+
 
 function technicianStatus(active: unknown, disputed: unknown) {
   if (disputed) {
@@ -705,7 +720,7 @@ async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
   const [deviceCounts, toInstallCounts, queueCounts, disputedCounts, assignedTasks, completedCounts, unpaidCommissions] = await Promise.all([
     deviceCountsByTechnician(supabase, technicianIds),
     workOrderCountsByTechnician(supabase, technicianIds, ["in_progress"]),
-    workOrderCountsByTechnician(supabase, technicianIds, ["assigned", "scheduled"]),
+    queuedDevicesByTechnician(supabase, technicianIds),
     disputedDeviceCountsByTechnician(supabase, technicianIds),
     assignedTasksByTechnician(supabase, technicianIds),
     completedInstallCountsByTechnician(supabase, technicianIds),
@@ -742,14 +757,14 @@ async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
 async function leadRows(supabase: SupabaseClient, searchQuery = "") {
   let query = supabase
     .from("leads")
-    .select("id,name,phone,whatsapp,source,location,vehicle_type,budget,stage,next_follow_up_at,assigned_technician_id,assigned_device_id,created_at,technicians(name),devices(imei)")
+    .select("id,name,phone,whatsapp,source,location,vehicle_type,budget,stage,next_follow_up_at,assigned_technician_id,assigned_device_id,created_at,technicians(name),devices(imei,consignment_number,courier_company)")
     .or("assigned_technician_id.is.null,assigned_device_id.is.null")
     .order("created_at", { ascending: false });
 
   const trimmedSearch = searchQuery.trim();
   if (trimmedSearch) {
     const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
-    query = query.or(`name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,location.ilike.%${escapedSearch}%,stage.ilike.%${escapedSearch}%`);
+    query = query.or(`name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,location.ilike.%${escapedSearch}%`);
   }
 
   const { data, error } = await query.limit(trimmedSearch ? 50 : 10);
@@ -763,6 +778,8 @@ async function leadRows(supabase: SupabaseClient, searchQuery = "") {
     const techName = techObj?.name ? String(techObj.name) : "";
     const deviceObj = row.devices as Record<string, unknown> | null;
     const deviceImei = deviceObj?.imei ? String(deviceObj.imei) : "";
+    const consignmentNumber = deviceObj?.consignment_number ? String(deviceObj.consignment_number) : "";
+    const courierCompany = deviceObj?.courier_company ? String(deviceObj.courier_company) : "";
     
     return [
       String(row.id ?? ""),
@@ -782,6 +799,8 @@ async function leadRows(supabase: SupabaseClient, searchQuery = "") {
       techName,
       String(row.assigned_device_id ?? ""),
       deviceImei,
+      consignmentNumber,
+      courierCompany,
     ];
   });
 }
@@ -988,6 +1007,31 @@ async function deviceCountsByTechnician(supabase: SupabaseClient, technicianIds:
   return counts;
 }
 
+async function queuedDevicesByTechnician(supabase: SupabaseClient, technicianIds: string[]) {
+  const counts = new Map<string, number>();
+
+  if (!technicianIds.length) {
+    return counts;
+  }
+
+  const { data, error } = await supabase
+    .from("devices")
+    .select("technician_id")
+    .in("technician_id", technicianIds)
+    .is("customer_id", null);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const row of data ?? []) {
+    const technicianId = String(row.technician_id);
+    counts.set(technicianId, (counts.get(technicianId) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
 async function disputedDeviceCountsByTechnician(supabase: SupabaseClient, technicianIds: string[]) {
   const counts = new Map<string, number>();
 
@@ -999,7 +1043,7 @@ async function disputedDeviceCountsByTechnician(supabase: SupabaseClient, techni
     .from("devices")
     .select("technician_id")
     .in("technician_id", technicianIds)
-    .or("status.ilike.%disputed%,status.ilike.%fault%,status.ilike.%faulty%,status.ilike.%issue%,status.ilike.%returned%,status.ilike.%replaced%");
+    .in("status", ["disputed", "fault", "faulty", "issue", "returned", "replaced"]);
 
   if (error) {
     throw error;
@@ -1068,8 +1112,11 @@ async function tableRows(supabase: SupabaseClient, table: string, columns: strin
   const trimmedSearch = searchQuery.trim();
   if (trimmedSearch) {
     const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
-    const searchFilters = columns.map(col => `${col}.ilike.%${escapedSearch}%`).join(",");
-    query = query.or(searchFilters);
+    const searchableCols = columns.filter(c => !["status", "custody_status", "created_at", "active", "paid", "direction", "priority"].includes(c));
+    if (searchableCols.length > 0) {
+      const searchFilters = searchableCols.map(col => `${col}.ilike.%${escapedSearch}%`).join(",");
+      query = query.or(searchFilters);
+    }
   }
 
   const { data, error } = await query.limit(trimmedSearch ? 50 : 10);

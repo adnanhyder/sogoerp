@@ -22,6 +22,8 @@ type LeadRecordActionsProps = {
   stage: string;
   vehicleType: string;
   whatsapp: string;
+  consignmentNumber?: string;
+  courierCompany?: string;
 };
 
 const stageOptions = [
@@ -65,6 +67,8 @@ export function LeadRecordActions({
   stage,
   vehicleType,
   whatsapp,
+  consignmentNumber = "",
+  courierCompany = "",
 }: LeadRecordActionsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -74,8 +78,8 @@ export function LeadRecordActions({
   // Assignment States
   const [draftTechnicianId, setDraftTechnicianId] = useState(assignedTechnicianId || "");
   const [draftDeviceId, setDraftDeviceId] = useState(assignedDeviceId || "");
-  const [draftConsignmentNumber, setDraftConsignmentNumber] = useState("");
-  const [draftCourierCompany, setDraftCourierCompany] = useState("");
+  const [draftConsignmentNumber, setDraftConsignmentNumber] = useState(consignmentNumber);
+  const [draftCourierCompany, setDraftCourierCompany] = useState(courierCompany);
   const [isSavingAssignment, setIsSavingAssignment] = useState(false);
   const [devices, setDevices] = useState<{ id: string; imei: string; technicianName: string; technician_id: string | null }[]>([]);
   const [technicians, setTechnicians] = useState<{ id: string; name: string; cities: string; deviceCount?: number }[]>([]);
@@ -346,6 +350,18 @@ export function LeadRecordActions({
           disabled={busy}
           onClick={() => {
             setError("");
+            setDraftName(name);
+            setDraftPhone(phone);
+            setDraftWhatsapp(whatsapp);
+            setDraftSource(source);
+            setDraftLocation(location);
+            setDraftVehicleType(vehicleType);
+            setDraftBudget(budget);
+            setDraftStage(stage);
+            setDraftTechnicianId(assignedTechnicianId || "");
+            setDraftDeviceId(assignedDeviceId || "");
+            setDraftConsignmentNumber(consignmentNumber || "");
+            setDraftCourierCompany(courierCompany || "");
             setIsEditing(true);
           }}
           type="button"
@@ -360,6 +376,10 @@ export function LeadRecordActions({
           disabled={busy}
           onClick={() => {
             setError("");
+            setDraftTechnicianId(assignedTechnicianId || "");
+            setDraftDeviceId(assignedDeviceId || "");
+            setDraftConsignmentNumber(consignmentNumber || "");
+            setDraftCourierCompany(courierCompany || "");
             setIsFollowUpOpen(true);
           }}
           type="button"

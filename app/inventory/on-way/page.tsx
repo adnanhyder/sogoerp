@@ -2,11 +2,15 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ErpShell } from "@/app/_components/erp-shell";
 import { OnWayTable } from "./on-way-table";
-import { Search } from "lucide-react";
+import { OnWayFilters } from "./on-way-filters";
+
+export const dynamic = "force-dynamic";
 
 type OnWayPageProps = {
   searchParams?: Promise<{
     q?: string;
+    courier?: string;
+    technician_id?: string;
   }>;
 };
 
@@ -15,6 +19,8 @@ export default async function OnWayPage({ searchParams }: OnWayPageProps) {
   const supabase = await createClient();
   const params = await searchParams;
   const q = params?.q?.trim() ?? "";
+  const courier = params?.courier?.trim() ?? "";
+  const technicianId = params?.technician_id?.trim() ?? "";
 
   // Fetch all on-the-way devices to calculate metrics in memory
   const { data: allOnWay, error } = await supabase
@@ -32,14 +38,40 @@ export default async function OnWayPage({ searchParams }: OnWayPageProps) {
 
   const totalOnWay = allOnWay?.length ?? 0;
   
-  // Calculate unique couriers
+  // Calculate unique couriers for metrics and filter options
   const couriers = allOnWay
-    ?.map((d) => d.courier_company)
-    .filter((c): c is string => typeof c === "string" && c.trim().length > 0) ?? [];
-  const uniqueCouriers = new Set(couriers).size;
+    ?.map((d) => d.courier_company?.trim())
+    .filter((c): c is string => typeof c === "string" && c.length > 0) ?? [];
+  const uniqueCouriersList = Array.from(new Set(couriers)).sort();
+  const uniqueCouriers = uniqueCouriersList.length;
 
-  // Filter devices by search term if provided
+  // Calculate unique technicians for the filter options
+  const technicianMap = new Map<string, string>();
+  for (const d of allOnWay ?? []) {
+    if (d.technician_id) {
+      const techObj = Array.isArray(d.technicians) ? d.technicians[0] : d.technicians;
+      const techName = techObj?.name || "Unknown Technician";
+      technicianMap.set(d.technician_id, techName);
+    }
+  }
+  const uniqueTechniciansList = Array.from(technicianMap.entries()).map(([id, name]) => ({
+    id,
+    name,
+  })).sort((a, b) => a.name.localeCompare(b.name));
+
+  // Filter devices by parameters if provided
   let filteredDevices = allOnWay ?? [];
+
+  if (courier) {
+    filteredDevices = filteredDevices.filter(
+      (d) => (d.courier_company || "").toLowerCase() === courier.toLowerCase()
+    );
+  }
+
+  if (technicianId) {
+    filteredDevices = filteredDevices.filter((d) => d.technician_id === technicianId);
+  }
+
   if (q) {
     const searchLower = q.toLowerCase();
     filteredDevices = filteredDevices.filter(
@@ -71,22 +103,17 @@ export default async function OnWayPage({ searchParams }: OnWayPageProps) {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <form className="relative flex flex-1 max-w-md items-center" method="GET">
-          <input
-            type="text"
-            name="q"
-            defaultValue={q}
-            placeholder="Search IMEI, consignment, or courier..."
-            className="w-full rounded-[10px] border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm font-medium text-black outline-none transition placeholder:text-gray-400 focus:border-black"
-          />
-          <Search className="absolute left-3 size-4 text-gray-400" strokeWidth={2.2} />
-        </form>
-      </div>
+      {/* Search & Filters */}
+      <OnWayFilters
+        initialQ={q}
+        initialCourier={courier}
+        initialTechnicianId={technicianId}
+        courierOptions={uniqueCouriersList}
+        technicianOptions={uniqueTechniciansList}
+      />
 
       {/* Table Section */}
-      <OnWayTable initialDevices={filteredDevices as any} />
+      <OnWayTable devices={filteredDevices as any} />
     </ErpShell>
   );
 }

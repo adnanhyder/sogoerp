@@ -120,27 +120,27 @@ export function PaidCommissionsTable() {
           <table className="w-full text-left text-sm border-collapse min-w-[900px]">
             <thead className="bg-[#fbfbfb] text-gray-500 uppercase text-[10px] tracking-wider font-extrabold border-b border-gray-100">
               <tr>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] w-16">#</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Technician</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Reason</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a]">Payment Date</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] text-right">Amount</th>
-                <th className="px-6 py-4 font-extrabold text-[#7a7a7a] text-center w-32">Receipt</th>
+                <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a] w-16">#</th>
+                <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a]">Technician</th>
+                <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a]">Reason</th>
+                <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a]">Payment Date</th>
+                <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a] text-right">Amount</th>
+                <th className="whitespace-nowrap px-6 py-4 font-extrabold text-[#7a7a7a] text-center w-32">Receipt</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredCommissions.map((c, idx) => (
                 <tr key={c.id} className="hover:bg-[#fbfbfb]/80 transition-colors">
-                  <td className="px-6 py-4.5 text-xs font-bold text-gray-400">{idx + 1}</td>
-                  <td className="px-6 py-4.5">
+                  <td className="whitespace-nowrap px-6 py-4.5 text-xs font-bold text-gray-400">{idx + 1}</td>
+                  <td className="whitespace-nowrap px-6 py-4.5">
                     <span className="font-bold text-black">{c.technicians?.name ?? "Unknown Tech"}</span>
                   </td>
-                  <td className="px-6 py-4.5">
+                  <td className="whitespace-nowrap px-6 py-4.5">
                     <span className="text-xs font-semibold text-gray-700 bg-gray-50 px-2.5 py-1 rounded-[6px] border border-gray-100 inline-block">
                       {c.reason}
                     </span>
                   </td>
-                  <td className="px-6 py-4.5 text-xs font-semibold text-gray-500">
+                  <td className="whitespace-nowrap px-6 py-4.5 text-xs font-semibold text-gray-500">
                     {new Date(c.created_at).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -149,10 +149,10 @@ export function PaidCommissionsTable() {
                       minute: "2-digit",
                     })}
                   </td>
-                  <td className="px-6 py-4.5 text-right">
+                  <td className="whitespace-nowrap px-6 py-4.5 text-right">
                     <span className="font-black text-green-700 tabular-nums">Rs. {c.amount.toLocaleString()}</span>
                   </td>
-                  <td className="px-6 py-4.5 text-center">
+                  <td className="whitespace-nowrap px-6 py-4.5 text-center">
                     {c.receipt_url ? (
                       <button
                         type="button"
@@ -174,7 +174,7 @@ export function PaidCommissionsTable() {
                 <td colSpan={4} className="px-6 py-4.5 text-xs font-extrabold text-gray-700 uppercase tracking-wider">
                   Total Paid Volume
                 </td>
-                <td className="px-6 py-4.5 text-right">
+                <td className="whitespace-nowrap px-6 py-4.5 text-right">
                   <span className="font-black text-green-800 text-sm tabular-nums">Rs. {totalPaid.toLocaleString()}</span>
                 </td>
                 <td />

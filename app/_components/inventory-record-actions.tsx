@@ -17,6 +17,7 @@ type InventoryRecordActionsProps = {
   technicianId: string;
   consignmentNumber?: string;
   courierCompany?: string;
+  sentByTechnicianId?: string;
 };
 
 type TechnicianOption = {
@@ -39,6 +40,7 @@ export function InventoryRecordActions({
   technicianId,
   consignmentNumber = "",
   courierCompany = "",
+  sentByTechnicianId = "",
 }: InventoryRecordActionsProps) {
   const router = useRouter();
   const [error, setError] = useState("");
@@ -56,6 +58,7 @@ export function InventoryRecordActions({
   const [draftTechnicianId, setDraftTechnicianId] = useState(technicianId || "");
   const [draftConsignmentNumber, setDraftConsignmentNumber] = useState(consignmentNumber);
   const [draftCourierCompany, setDraftCourierCompany] = useState(courierCompany);
+  const [draftSentByTechnicianId, setDraftSentByTechnicianId] = useState(sentByTechnicianId || "");
 
   useEffect(() => {
     let ignore = false;
@@ -104,9 +107,10 @@ export function InventoryRecordActions({
           imei: draftImei,
           purchase_cost: draftPurchaseCost,
           status: draftStatus,
-          technician_id: draftTechnicianId,
-          consignment_number: draftCustody === "on_the_way" ? draftConsignmentNumber || null : null,
-          courier_company: draftCustody === "on_the_way" ? draftCourierCompany || null : null,
+          technician_id: draftCustody === "company_hands" ? null : draftTechnicianId || null,
+          sent_by_technician_id: draftSentByTechnicianId || null,
+          consignment_number: draftConsignmentNumber || null,
+          courier_company: draftCourierCompany || null,
         },
       }),
       headers: { "Content-Type": "application/json" },
@@ -159,6 +163,17 @@ export function InventoryRecordActions({
           disabled={busy}
           onClick={() => {
             setError("");
+            if (!isEditing) {
+              setDraftImei(imei);
+              setDraftStatus(status === "-" ? "" : status);
+              setDraftCustody(custodyStatus);
+              setDraftHasMic(hasMic);
+              setDraftPurchaseCost(purchaseCost);
+              setDraftTechnicianId(technicianId || "");
+              setDraftConsignmentNumber(consignmentNumber || "");
+              setDraftCourierCompany(courierCompany || "");
+              setDraftSentByTechnicianId(sentByTechnicianId || "");
+            }
             setIsEditing((open) => !open);
           }}
           type="button"
@@ -247,61 +262,84 @@ export function InventoryRecordActions({
                 </select>
               </label>
               
-              <label className="block sm:col-span-2">
-                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Received By Technician</span>
-                <select
-                  className="h-12 w-full rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                  onChange={(event) => {
-                    const newTechId = event.target.value;
-                    setDraftTechnicianId(newTechId);
-  
-                    if (newTechId) {
-                      setDraftCustody("on_the_way");
-                      setDraftStatus("assigned");
-                    } else {
-                      setDraftCustody("company_hands");
-                      setDraftStatus("clear");
-                    }
-                  }}
-                  value={draftTechnicianId}
-                >
-                  <option value="">No technician selected</option>
-                  {technicians.map((technician) => (
-                    <option key={technician.id} value={technician.id}>
-                      {technician.name} / {technician.cities || "No city"} / {technician.deviceCount} devices
-                      {!technician.active ? " / blocked" : ""}
-                    </option>
-                  ))}
-                </select>
-                {!technicians.length ? (
-                  <span className="mt-1 block text-[11px] font-semibold text-red-600">
-                    No technicians loaded. Add or unblock a technician first.
-                  </span>
-                ) : null}
-              </label>
+              {/* Transfer Section — always visible to allow re-assignment */}
+              <div className="sm:col-span-2 rounded-[14px] border-2 border-[#FAC54D]/40 bg-[#FAC54D]/5 p-4">
+                <p className="mb-3 text-[11px] font-extrabold uppercase tracking-wider text-[#b58b29]">📦 Device Transfer / Assignment</p>
+                <div className="grid gap-4 sm:grid-cols-2">
 
-              {draftCustody === "on_the_way" && (
-                <>
+                  {/* Sent By (the technician dispatching the device) */}
                   <label className="block">
-                    <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Courier Company</span>
-                    <input
-                      className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                      onChange={(event) => setDraftCourierCompany(event.target.value)}
-                      placeholder="e.g. TCS, Leopard"
-                      value={draftCourierCompany}
-                    />
+                    <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Sent By (Technician)</span>
+                    <select
+                      className="h-12 w-full rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                      onChange={(event) => setDraftSentByTechnicianId(event.target.value)}
+                      value={draftSentByTechnicianId}
+                    >
+                      <option value="">Company / No technician</option>
+                      {technicians.map((technician) => (
+                        <option key={technician.id} value={technician.id}>
+                          {technician.name} / {technician.cities || "No city"}
+                        </option>
+                      ))}
+                    </select>
                   </label>
+
+                  {/* Received By (the technician receiving the device) */}
                   <label className="block">
-                    <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Consignment Number</span>
-                    <input
-                      className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                      onChange={(event) => setDraftConsignmentNumber(event.target.value)}
-                      placeholder="Consignment No..."
-                      value={draftConsignmentNumber}
-                    />
+                    <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Received By (Technician)</span>
+                    <select
+                      className="h-12 w-full rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                      onChange={(event) => {
+                        const newTechId = event.target.value;
+                        setDraftTechnicianId(newTechId);
+                        if (newTechId && draftCustody === "company_hands") {
+                          setDraftCustody("on_the_way");
+                          setDraftStatus("assigned");
+                        }
+                        if (!newTechId) {
+                          setDraftSentByTechnicianId("");
+                        }
+                      }}
+                      value={draftTechnicianId}
+                    >
+                      <option value="">No technician selected</option>
+                      {technicians.map((technician) => (
+                        <option key={technician.id} value={technician.id}>
+                          {technician.name} / {technician.cities || "No city"} / {technician.deviceCount} devices
+                          {!technician.active ? " / blocked" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    {!technicians.length ? (
+                      <span className="mt-1 block text-[11px] font-semibold text-red-600">
+                        No technicians loaded. Add or unblock a technician first.
+                      </span>
+                    ) : null}
                   </label>
-                </>
-              )}
+
+                  {/* Courier info — always shown so data isn't lost, but only required when on_the_way */}
+                  <div className="space-y-4 pt-2">
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Courier Company {draftCustody === "on_the_way" && <span className="text-red-500">*</span>}</span>
+                      <input
+                        className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                        onChange={(event) => setDraftCourierCompany(event.target.value)}
+                        placeholder="e.g. TCS, Leopard, Trax"
+                        value={draftCourierCompany}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Consignment Number {draftCustody === "on_the_way" && <span className="text-red-500">*</span>}</span>
+                      <input
+                        className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                        onChange={(event) => setDraftConsignmentNumber(event.target.value)}
+                        placeholder="Consignment No..."
+                        value={draftConsignmentNumber}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
               
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Purchase Cost</span>

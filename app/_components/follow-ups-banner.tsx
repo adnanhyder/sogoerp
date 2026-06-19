@@ -55,10 +55,16 @@ export function FollowUpsBanner({ followUps }: FollowUpsBannerProps) {
             timeText = `Due in ${hoursLeft}h`;
           }
 
+              let href = `/leads?q=${encodeURIComponent(leadName)}&openFollowUps=${fu.lead_id}`;
+              const stage = leadObj?.stage;
+              if (stage === "installation_scheduled" || stage === "installed" || stage === "won") {
+                href = `/customers?q=${encodeURIComponent(leadName)}`;
+              }
+
           return (
             <a
               key={fu.id}
-              href={`/leads?q=${encodeURIComponent(leadName)}&openFollowUps=${fu.lead_id}`}
+              href={href}
               className="flex flex-col justify-between rounded-[12px] border border-[#FAC54D]/30 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#FAC54D] hover:shadow-md"
             >
               <div>

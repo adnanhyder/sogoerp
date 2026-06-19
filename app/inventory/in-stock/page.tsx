@@ -2,11 +2,15 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ErpShell } from "@/app/_components/erp-shell";
 import { InStockTable } from "./in-stock-table";
-import { Search } from "lucide-react";
+import { InStockFilters } from "./in-stock-filters";
+
+export const dynamic = "force-dynamic";
 
 type InStockPageProps = {
   searchParams?: Promise<{
     q?: string;
+    condition?: string;
+    has_mic?: string;
   }>;
 };
 
@@ -15,6 +19,8 @@ export default async function InStockPage({ searchParams }: InStockPageProps) {
   const supabase = await createClient();
   const params = await searchParams;
   const q = params?.q?.trim() ?? "";
+  const condition = params?.condition?.trim() ?? "";
+  const hasMicParam = params?.has_mic?.trim() ?? "";
 
   // Fetch all in-stock devices to calculate metrics in memory
   const { data: allInStock, error: metricsError } = await supabase
@@ -27,8 +33,20 @@ export default async function InStockPage({ searchParams }: InStockPageProps) {
   const refurbishedCount = allInStock?.filter((d) => d.device_condition === "refurbished" || d.device_condition === "used").length ?? 0;
   const faultyCount = allInStock?.filter((d) => d.device_condition === "faulty" || d.device_condition === "damaged").length ?? 0;
 
-  // Filter devices by search term if provided
+  // Filter devices by parameters if provided
   let filteredDevices = allInStock ?? [];
+
+  if (condition) {
+    filteredDevices = filteredDevices.filter(
+      (d) => (d.device_condition || "").toLowerCase() === condition.toLowerCase()
+    );
+  }
+
+  if (hasMicParam) {
+    const hasMicBool = hasMicParam === "true";
+    filteredDevices = filteredDevices.filter((d) => d.has_mic === hasMicBool);
+  }
+
   if (q) {
     const searchLower = q.toLowerCase();
     filteredDevices = filteredDevices.filter((d) => d.imei.toLowerCase().includes(searchLower));
@@ -60,22 +78,15 @@ export default async function InStockPage({ searchParams }: InStockPageProps) {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <form className="relative flex flex-1 max-w-md items-center" method="GET">
-          <input
-            type="text"
-            name="q"
-            defaultValue={q}
-            placeholder="Search IMEI..."
-            className="w-full rounded-[10px] border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm font-medium text-black outline-none transition placeholder:text-gray-400 focus:border-black"
-          />
-          <Search className="absolute left-3 size-4 text-gray-400" strokeWidth={2.2} />
-        </form>
-      </div>
+      {/* Search & Filters */}
+      <InStockFilters
+        initialQ={q}
+        initialCondition={condition}
+        initialHasMic={hasMicParam}
+      />
 
       {/* Table Section */}
-      <InStockTable initialDevices={filteredDevices} />
+      <InStockTable devices={filteredDevices} />
     </ErpShell>
   );
 }
