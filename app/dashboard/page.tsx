@@ -315,22 +315,7 @@ export default async function DashboardPage() {
               </div>
             </article>
 
-            <article className="rounded-[16px] border border-gray-100 bg-white p-6 sm:p-8 shadow-sm ring-1 ring-gray-100/50">
-              <h2 className="text-lg font-bold text-black">Analytics</h2>
-              <div className="mt-6 flex h-[150px] items-end justify-between gap-2">
-                {bars.map((bar, index) => (
-                  <div className="flex h-full flex-1 flex-col items-center justify-end gap-3" key={`${bar}-${index}`}>
-                    <div
-                      className={`w-full rounded-[6px] border border-[#d2d2d2] ${
-                        index === 2 || index === 3 ? "bg-black" : "bg-[#fbfbfb]"
-                      }`}
-                      style={{ height: `${bar}%` }}
-                    />
-                    <span className="text-xs text-[#999999]">{18 + index} Jun</span>
-                  </div>
-                ))}
-              </div>
-            </article>
+
 
             {moduleSnapshots.map((snapshot) => (
               <article

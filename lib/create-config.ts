@@ -232,6 +232,11 @@ export const createConfigs = {
       { label: "Message", name: "message", required: true, type: "text" },
     ],
   },
+  customer_records_history: {
+    moduleKey: "customer_records_history",
+    table: "customer_records_history",
+    fields: [],
+  },
 } as const;
 
 export type CreateModuleKey = keyof typeof createConfigs;

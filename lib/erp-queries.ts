@@ -148,9 +148,11 @@ export async function getDashboardData(
       secondary: [0, 0, 0, 0, 0, 0, 0, 0],
     },
     kpis: [
-      { label: "Active Devices", value: "0", detail: "0 total devices" },
-      { label: "Monthly Sales", value: "$0", detail: "$0 expenses" },
-      { label: "Pending Installs", value: "0", detail: "0 work orders total" },
+      { label: "Devices in Queue", value: "0", detail: "Awaiting assignment" },
+      { label: "Devices with Technicians", value: "0", detail: "Currently with field techs" },
+      { label: "On the Way", value: "0", detail: "In transit to technicians" },
+      { label: "Installed Devices", value: "0", detail: "Completed installations" },
+      { label: "Total Devices", value: "0", detail: "Excluding installed devices" },
     ],
     moduleSnapshots: [
       {
@@ -169,15 +171,6 @@ export async function getDashboardData(
           ["Completed Today", "0"],
           ["Awaiting Proof", "0"],
           ["SLA Risk", "0"],
-        ],
-      },
-      {
-        title: "Finance Pulse",
-        rows: [
-          ["Revenue", "$0"],
-          ["Expenses", "$0"],
-          ["Pay Technicians", "$0"],
-          ["Net Profit", "$0"],
         ],
       },
     ],
@@ -334,6 +327,20 @@ export async function getDashboardData(
       return leads.filter(l => l.created_at && String(l.created_at).startsWith(date)).length;
     });
 
+    const installedCount = activeDevices;
+    const onTheWayCount = devices.filter((d) => d.custody_status === "on_the_way").length;
+    const techDevicesCount = techDevices;
+    const inQueueCount = devices.filter((d) => 
+       !["installed", "activated_with_sim", "active"].includes(d.status ?? "") &&
+       d.custody_status !== "on_the_way" && 
+       d.custody_status !== "received_by_technician"
+    ).length;
+    const installedThisMonthCount = devices.filter((d) =>
+      ["installed", "activated_with_sim", "active"].includes(d.status ?? "") &&
+      d.installation_date && d.installation_date >= monthStart
+    ).length;
+    const totalValidDevices = totalDevices - installedCount;
+
     return {
       data: {
         bars: leadStages.map((count) =>
@@ -345,19 +352,34 @@ export async function getDashboardData(
         },
         kpis: [
           {
-            label: "Active Devices",
-            value: formatCount(activeDevices),
-            detail: `${formatCount(totalDevices)} total devices`,
+            label: "Devices in Queue",
+            value: formatCount(inQueueCount),
+            detail: "Awaiting assignment",
           },
           {
-            label: "Monthly Sales",
-            value: formatMoney(monthlyIncome),
-            detail: `${formatMoney(totalExpenses)} expenses`,
+            label: "Devices with Technicians",
+            value: formatCount(techDevicesCount),
+            detail: "Currently with field techs",
           },
           {
-            label: "Pending Installs",
-            value: formatCount(pendingInstalls),
-            detail: `${formatCount(totalWorkOrders)} work orders total`,
+            label: "On the Way",
+            value: formatCount(onTheWayCount),
+            detail: "In transit to technicians",
+          },
+          {
+            label: "Installed Devices",
+            value: formatCount(installedCount),
+            detail: "Completed installations",
+          },
+          {
+            label: "Installed This Month",
+            value: formatCount(installedThisMonthCount),
+            detail: "Installations in current month",
+          },
+          {
+            label: "Total Devices",
+            value: formatCount(totalValidDevices),
+            detail: "Excluding installed devices",
           },
         ],
         moduleSnapshots: [
@@ -377,15 +399,6 @@ export async function getDashboardData(
               ["Completed Today", formatCount(completedToday)],
               ["Awaiting Proof", formatCount(awaitingProof)],
               ["SLA Risk", formatCount(slaRisk)],
-            ],
-          },
-          {
-            title: "Finance Pulse",
-            rows: [
-              ["Revenue", formatMoney(monthlyIncome)],
-              ["Expenses", formatMoney(monthlyExpenses + monthlyDevicePurchaseCost)],
-              ["Pay Technicians", formatMoney(monthlyTechnicianCommissions)],
-              ["Net Profit", formatMoney(netProfit)],
             ],
           },
         ],
@@ -467,24 +480,30 @@ export async function getModuleData(
   try {
     switch (key) {
       case "inventory": {
-        const [total, companyHands, onTheWay, withTechnicians, faulty, installed, tableRows] = await Promise.all([
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+          .toISOString()
+          .slice(0, 10);
+
+        const [total, companyHands, onTheWay, withTechnicians, faulty, installed, installedThisMonth, tableRows] = await Promise.all([
           countRows(supabase, "devices"),
           countRows(supabase, "devices", (query) => query.eq("custody_status", "company_hands")),
           countRows(supabase, "devices", (query) => query.eq("custody_status", "on_the_way")),
           countRows(supabase, "devices", (query) => query.eq("custody_status", "received_by_technician")),
           countRows(supabase, "devices", (query) => query.eq("status", "faulty")),
-          countRows(supabase, "devices", (query) => query.eq("status", "installed")),
+          countRows(supabase, "devices", (query) => query.in("status", ["installed", "activated_with_sim", "active"])),
+          countRows(supabase, "devices", (query) => query.in("status", ["installed", "activated_with_sim", "active"]).gte("installation_date", monthStart)),
           inventoryRows(supabase, options.searchQuery)
         ]);
         return {
           data: {
             metrics: [
-              { label: "Total Stock", value: formatCount(total), detail: "All device records" },
-              { label: "Company Hands", value: formatCount(companyHands), detail: "Devices still with company" },
-              { label: "On The Way", value: formatCount(onTheWay), detail: "Courier / technician handoff" },
-              { label: "With Technicians", value: formatCount(withTechnicians), detail: "Received by technicians" },
-              { label: "Faulty", value: formatCount(faulty), detail: "Pending replacement" },
-              { label: "Installed Devices", value: formatCount(installed), detail: "Successfully installed" },
+              { label: "Devices in Queue", value: formatCount(total - installed - onTheWay - withTechnicians), detail: "Awaiting assignment" },
+              { label: "Devices with Technicians", value: formatCount(withTechnicians), detail: "Currently with field techs" },
+              { label: "On the Way", value: formatCount(onTheWay), detail: "In transit to technicians" },
+              { label: "Installed Devices", value: formatCount(installed), detail: "Completed installations" },
+              { label: "Installed This Month", value: formatCount(installedThisMonth), detail: "Installations in current month" },
+              { label: "Total Devices", value: formatCount(total - installed), detail: "Excluding installed devices" },
             ],
             rows: tableRows,
           },

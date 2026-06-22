@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Papa from "papaparse";
 import type { CreateConfig } from "@/lib/create-config";
 import { LoadingSpinner } from "./loading-spinner";
 import { DateTimePicker } from "./date-time-picker";
@@ -39,6 +40,66 @@ export function CreateRecordForm({ config, onSuccess }: CreateRecordFormProps) {
   const [conversationNotes, setConversationNotes] = useState("");
   const needsCustomers = config.fields.some((field) => field.type === "customer-select");
   const needsTechnicians = config.fields.some((field) => field.type === "technician-select") || config.moduleKey === "leads";
+  
+  const csvInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCsvImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const rows = results.data as Record<string, string>[];
+          
+          if (!rows.length) {
+            setError("CSV file is empty.");
+            setLoading(false);
+            return;
+          }
+
+          // Normalize keys if needed, but for now expect exact matches with config field names
+          const response = await fetch("/api/erp/bulk-create", {
+            body: JSON.stringify({
+              moduleKey: config.moduleKey,
+              records: rows,
+            }),
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+          });
+          
+          const result = await response.json() as { error?: string, ok?: boolean, count?: number };
+          
+          setLoading(false);
+          
+          if (!response.ok || result.error) {
+            setError(result.error ?? "Unable to import CSV records.");
+            return;
+          }
+
+          setSuccess(`Successfully imported ${result.count} records!`);
+          if (onSuccess) onSuccess();
+          router.refresh();
+        } catch (err) {
+          setError(String(err));
+          setLoading(false);
+        }
+      },
+      error: (err) => {
+        setError(err.message);
+        setLoading(false);
+      }
+    });
+    
+    // reset input
+    if (csvInputRef.current) csvInputRef.current.value = "";
+  };
 
   useEffect(() => {
     if (!needsTechnicians) {
@@ -298,15 +359,37 @@ export function CreateRecordForm({ config, onSuccess }: CreateRecordFormProps) {
             </div>
           ) : null}
         </div>
-        <button
-          className="group relative inline-flex h-14 min-w-[180px] items-center justify-center gap-3 overflow-hidden rounded-2xl bg-[#FAC54D] px-8 text-[15px] font-bold text-gray-900 shadow-[0_8px_20px_-8px_rgba(250,197,77,0.5)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_15px_25px_-8px_rgba(250,197,77,0.6)] hover:bg-[#e0b040] disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0"
-          disabled={loading}
+        <div className="flex items-center gap-4">
+          {(config.moduleKey === "inventory" || config.moduleKey === "technicians") && (
+            <>
+              <input 
+                type="file" 
+                accept=".csv" 
+                className="hidden" 
+                ref={csvInputRef} 
+                onChange={handleCsvImport} 
+              />
+              <button
+                type="button"
+                onClick={() => csvInputRef.current?.click()}
+                disabled={loading}
+                className="group relative inline-flex h-14 items-center justify-center gap-3 overflow-hidden rounded-2xl bg-white border-2 border-gray-200 px-8 text-[15px] font-bold text-gray-700 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-gray-300 hover:bg-gray-50 disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0"
+              >
+                {loading ? <LoadingSpinner /> : null}
+                <span className="relative">Import CSV</span>
+              </button>
+            </>
+          )}
+          <button
+            className="group relative inline-flex h-14 min-w-[180px] items-center justify-center gap-3 overflow-hidden rounded-2xl bg-[#FAC54D] px-8 text-[15px] font-bold text-gray-900 shadow-[0_8px_20px_-8px_rgba(250,197,77,0.5)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_15px_25px_-8px_rgba(250,197,77,0.6)] hover:bg-[#e0b040] disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0"
+            disabled={loading}
           type="submit"
         >
           <div className="absolute inset-0 bg-white/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
           {loading ? <LoadingSpinner /> : null}
           <span className="relative">{loading ? "Processing..." : "Save Record"}</span>
         </button>
+        </div>
       </div>
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes slideUpFade {

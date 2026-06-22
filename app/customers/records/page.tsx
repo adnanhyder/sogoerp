@@ -6,10 +6,14 @@ import { History } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 import { ViewDetailsModal } from "./view-details-modal";
+import { getErpUserContext } from "@/lib/erp-context";
+import { DeleteHistoryRecordButton } from "./delete-history-button";
 
 export default async function CustomersRecordPage() {
   const user = await requireUser();
   const supabase = await createClient();
+  const context = await getErpUserContext(supabase);
+  const isAdmin = context.role === "admin";
 
   const { data: records } = await supabase
     .from("customer_records_history")
@@ -86,7 +90,7 @@ export default async function CustomersRecordPage() {
                         {new Date(record.deleted_at).toLocaleString("en-US", { hour: "numeric", minute: "numeric", hour12: true })}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
                       <ViewDetailsModal record={{
                         customer_name: record.customer_name ?? "",
                         customer_id: record.customer_id ?? "",
@@ -97,6 +101,9 @@ export default async function CustomersRecordPage() {
                         status: record.status ?? "",
                         deleted_at: record.deleted_at ?? "",
                       }} />
+                      {isAdmin ? (
+                        <DeleteHistoryRecordButton id={record.id} />
+                      ) : null}
                     </td>
                   </tr>
                 ))
