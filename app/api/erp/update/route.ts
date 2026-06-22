@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createConfigs, type CreateConfig, type CreateModuleKey } from "@/lib/create-config";
 import { getErpUserContext, requireRole } from "@/lib/erp-context";
-import { configMap } from "@/lib/module-config";
+
 import { createClient } from "@/lib/supabase/server";
 import { convertLeadToCustomer } from "@/lib/lead-conversion";
 
@@ -262,6 +262,7 @@ export async function PATCH(request: Request) {
 
   try {
     context = await getErpUserContext(supabase);
+    if (!context.organizationId) throw new Error("No organization context found.");
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Authentication required." },
@@ -306,7 +307,7 @@ export async function PATCH(request: Request) {
     }
 
     try {
-      await convertLeadToCustomer(supabase, body.id, context);
+      await convertLeadToCustomer(supabase, body.id, context as any);
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Failed to convert lead to customer." },
@@ -360,7 +361,7 @@ export async function PATCH(request: Request) {
       .maybeSingle();
 
     if (associatedLead) {
-      await promoteLeadToCustomer(supabase, associatedLead.id, context);
+      await promoteLeadToCustomer(supabase, associatedLead.id, context as any);
     }
   }
 

@@ -8,6 +8,7 @@ export async function POST(request: Request) {
   let orgId: string;
   try {
     const ctx = await getErpUserContext(supabase);
+    if (!ctx.organizationId) throw new Error("No organization context found.");
     orgId = ctx.organizationId;
   } catch (error) {
     return NextResponse.json(

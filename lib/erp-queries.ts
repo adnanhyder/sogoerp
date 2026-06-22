@@ -492,12 +492,12 @@ export async function getModuleData(
         };
       }
       case "integrations": {
-        const [apiSources, inboundEvents, importJobs, exportJobs, tableRows] = await Promise.all([
+        const [apiSources, inboundEvents, importJobs, exportJobs, rowsData] = await Promise.all([
           countRows(supabase, "api_sources"),
           countRows(supabase, "inbound_events"),
           countRows(supabase, "import_jobs"),
           countRows(supabase, "export_jobs"),
-          tableRowsQuery(supabase, "api_sources", ["name", "source_key", "active", "created_at"], options.searchQuery)
+          tableRows(supabase, "api_sources", ["name", "source_key", "active", "created_at"], options.searchQuery)
         ]);
         return {
           data: {
@@ -507,7 +507,7 @@ export async function getModuleData(
               { label: "Import Jobs", value: formatCount(importJobs), detail: "CSV/XLSX batches" },
               { label: "Export Jobs", value: formatCount(exportJobs), detail: "Generated files" },
             ],
-            rows: tableRows,
+            rows: rowsData,
           },
           error: null,
         };
@@ -594,12 +594,12 @@ export async function getModuleData(
       case "tracking":
         return moduleQuery(supabase, "tracking_events", ["entity", "location", "signal", "last_update", "status"], options.searchQuery);
       case "settings": {
-        const [settings, apiSourcesSettings, inboundEventsSettings, importJobsSettings, tableRows] = await Promise.all([
+        const [settings, apiSourcesSettings, inboundEventsSettings, importJobsSettings, rowsData] = await Promise.all([
           countRows(supabase, "settings_items"),
           countRows(supabase, "api_sources"),
           countRows(supabase, "inbound_events"),
           countRows(supabase, "import_jobs"),
-          tableRowsQuery(supabase, "settings_items", ["name", "area", "owner", "created_at", "status"], options.searchQuery)
+          tableRows(supabase, "settings_items", ["name", "area", "owner", "created_at", "status"], options.searchQuery)
         ]);
         return {
           data: {
@@ -609,7 +609,7 @@ export async function getModuleData(
               { label: "Inbound Events", value: formatCount(inboundEventsSettings), detail: "Received payloads" },
               { label: "Import Jobs", value: formatCount(importJobsSettings), detail: "CSV/XLSX batches" },
             ],
-            rows: tableRows,
+            rows: rowsData,
           },
           error: null,
         };

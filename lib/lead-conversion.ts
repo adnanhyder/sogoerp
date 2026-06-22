@@ -4,7 +4,7 @@ import { organizationPayload } from "@/lib/erp-context";
 export async function convertLeadToCustomer(
   supabase: SupabaseClient,
   leadId: string,
-  context: { organizationId: string; userId: string }
+  context: any
 ) {
   // First, check if already converted to prevent duplicates
   const { data: existingCustomer } = await supabase
