@@ -1,6 +1,6 @@
 "use client";
 
-import { X, CalendarClock, CheckCircle2, RotateCcw, Trash, Trophy } from "lucide-react";
+import { X, CalendarClock, CheckCircle2, RotateCcw, Trash, Trash2, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LoadingSpinner } from "./loading-spinner";
