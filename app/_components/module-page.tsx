@@ -225,6 +225,8 @@ export function ModulePage({
                         consignmentNumber={row[19] ?? ""}
                         courierCompany={row[20] ?? ""}
                         sentByTechnicianId={row[21] ?? ""}
+                        dispatchedAt={row[23] ?? ""}
+                        receivedAt={row[24] ?? ""}
                       />
                     </td>
                   ) : null}

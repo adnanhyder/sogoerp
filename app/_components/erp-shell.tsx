@@ -60,6 +60,10 @@ export function ErpShell({
       ["/inventory/in-stock", "/inventory/on-way", "/inventory/received", "/inventory/installed"].includes(activeHref)
     );
   });
+  
+  const [isCustomersOpen, setIsCustomersOpen] = useState(() => {
+    return activeHref === "/customers/records" || activeHref === "/customers";
+  });
 
   return (
     <main className="min-h-screen bg-white">
@@ -82,20 +86,22 @@ export function ErpShell({
 
                 return (
                   <div key={item.href} className="flex flex-col">
-                    <Link
-                      className={`relative flex min-h-12 items-center gap-4 px-8 py-3 text-sm transition ${
-                        active
-                          ? "bg-black font-semibold text-white"
-                          : "text-[#777777] hover:bg-[#fbfbfb] hover:text-black"
-                      }`}
-                      href={item.href}
-                    >
-                      {active ? (
-                        <span className="absolute left-2.5 h-6 w-1 rounded-full bg-white" />
-                      ) : null}
-                      <Icon className="size-[19px] shrink-0" strokeWidth={1.8} />
-                      <span>{item.title}</span>
-                    </Link>
+                    {item.href !== "/customers" && (
+                      <Link
+                        className={`relative flex min-h-12 items-center gap-4 px-8 py-3 text-sm transition ${
+                          active
+                            ? "bg-black font-semibold text-white"
+                            : "text-[#777777] hover:bg-[#fbfbfb] hover:text-black"
+                        }`}
+                        href={item.href}
+                      >
+                        {active ? (
+                          <span className="absolute left-2.5 h-6 w-1 rounded-full bg-white" />
+                        ) : null}
+                        <Icon className="size-[19px] shrink-0" strokeWidth={1.8} />
+                        <span>{item.title}</span>
+                      </Link>
+                    )}
 
                     {item.href === "/inventory" && (
                       <div className="flex flex-col">
@@ -128,6 +134,56 @@ export function ErpShell({
                               { title: "-- Inventory On Way", href: "/inventory/on-way" },
                               { title: "-- Inventory Received", href: "/inventory/received" },
                               { title: "-- Inventory Installed", href: "/inventory/installed" },
+                            ].map((sub) => {
+                              const subActive = activeHref === sub.href;
+                              return (
+                                <Link
+                                  key={sub.href}
+                                  href={sub.href}
+                                  className={`text-xs py-1 transition ${
+                                    subActive
+                                      ? "text-black font-semibold"
+                                      : "text-[#777777] hover:text-black"
+                                  }`}
+                                >
+                                  {sub.title}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {item.href === "/customers" && (
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomersOpen(!isCustomersOpen)}
+                          className={`relative flex min-h-12 w-full items-center justify-between px-8 py-3 text-sm transition cursor-pointer text-left ${
+                            activeHref === "/customers/records" || activeHref === "/customers"
+                              ? "bg-black font-semibold text-white"
+                              : "text-[#777777] hover:bg-[#fbfbfb] hover:text-black"
+                          }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            {activeHref === "/customers/records" || activeHref === "/customers" ? (
+                              <span className="absolute left-2.5 h-6 w-1 rounded-full bg-white" />
+                            ) : null}
+                            <Icon className="size-[19px] shrink-0" strokeWidth={1.8} />
+                            <span>Customers</span>
+                          </div>
+                          <ChevronDown
+                            className={`size-4 shrink-0 transition-transform duration-200 ${
+                              isCustomersOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                        {isCustomersOpen && (
+                          <div className="flex flex-col border-l border-[#d2d2d2] ml-10 my-1 pl-3 gap-1.5">
+                            {[
+                              { title: "-- Active Customers", href: "/customers" },
+                              { title: "-- Deleted Records", href: "/customers/records" },
                             ].map((sub) => {
                               const subActive = activeHref === sub.href;
                               return (

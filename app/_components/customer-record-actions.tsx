@@ -58,6 +58,9 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
   const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
   const [technicianId, setTechnicianId] = useState("");
 
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleteNotes, setDeleteNotes] = useState("");
+
   const [isInstallOpen, setIsInstallOpen] = useState(false);
   const [devices, setDevices] = useState<{ id: string; imei: string; technicianName: string }[]>([]);
   const [installDeviceId, setInstallDeviceId] = useState(assignedDeviceId || "");
@@ -226,6 +229,15 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
   }
 
   async function deleteCustomer() {
+    if (!deleteReason) {
+      setError("Please select a reason for deletion.");
+      return;
+    }
+    if (deleteReason === "Other" && !deleteNotes.trim()) {
+      setError("Please provide a reason in the text area.");
+      return;
+    }
+
     setError("");
     setLoading(true);
 
@@ -233,6 +245,8 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
       body: JSON.stringify({
         id: customerId,
         moduleKey: "customers",
+        reason: deleteReason,
+        notes: deleteReason === "Other" ? deleteNotes : "",
       }),
       headers: { "Content-Type": "application/json" },
       method: "DELETE",
@@ -612,19 +626,85 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
         </div>
       ) : null}
 
-      <AlertModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={() => {
-          setIsDeleteModalOpen(false);
-          deleteCustomer();
-        }}
-        title="Delete Customer"
-        description={`Are you sure you want to permanently delete ${name}? This will also remove their vehicles, work orders, meetings, insurance policies, and completely delete their successfully installed device from the database.`}
-        confirmText="Delete"
-        type="delete"
-        isLoading={loading}
-      />
+      {isDeleteModalOpen ? (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="w-full max-w-[450px] rounded-[24px] bg-white p-8 shadow-2xl animate-[slideUpFade_0.3s_ease-out_both]">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-red-100">
+                <Trash2 className="size-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Delete Customer</h3>
+                <p className="text-sm text-gray-500">Why do you want to remove {name}?</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-gray-500">Reason</span>
+                <select
+                  className="h-12 w-full appearance-none rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all hover:border-gray-300 focus:border-red-500 focus:ring-4 focus:ring-red-500/20"
+                  onChange={(e) => {
+                    setDeleteReason(e.target.value);
+                    setError("");
+                  }}
+                  value={deleteReason}
+                >
+                  <option value="">Select a reason</option>
+                  <option value="Duplicate Entry">Duplicate Entry</option>
+                  <option value="Customer Requested">Customer Requested</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+
+              {deleteReason === "Other" ? (
+                <label className="block animate-[fadeIn_0.2s_ease-out]">
+                  <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-gray-500">Specify Reason</span>
+                  <textarea
+                    className="w-full resize-none rounded-[12px] border-2 border-gray-200 p-4 text-sm font-medium text-gray-900 outline-none transition-all hover:border-gray-300 focus:border-red-500 focus:ring-4 focus:ring-red-500/20"
+                    onChange={(e) => {
+                      setDeleteNotes(e.target.value);
+                      setError("");
+                    }}
+                    placeholder="Enter custom reason..."
+                    rows={3}
+                    value={deleteNotes}
+                  />
+                </label>
+              ) : null}
+
+              <div className="rounded-[12px] bg-red-50 p-4 text-xs font-semibold text-red-800">
+                This action cannot be undone. All related records will also be permanently deleted.
+              </div>
+            </div>
+
+            <div className="mt-8 flex justify-end gap-3">
+              <button
+                className="inline-flex h-11 items-center justify-center rounded-[10px] bg-gray-100 px-5 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
+                disabled={loading}
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setDeleteReason("");
+                  setDeleteNotes("");
+                  setError("");
+                }}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] bg-red-600 px-6 text-sm font-bold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50"
+                disabled={loading || !deleteReason}
+                onClick={deleteCustomer}
+                type="button"
+              >
+                {loading ? <LoadingSpinner className="size-4" /> : null}
+                {loading ? "Deleting..." : "Delete Permanently"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

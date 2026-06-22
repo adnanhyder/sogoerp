@@ -39,7 +39,7 @@ export const restModules = {
     table: "api_sources",
   },
   inventory: {
-    fields: ["imei", "purchase_cost", "sale_price", "status", "has_mic", "custody_status", "custody_updated_at", "technician_id", "customer_id", "vehicle_id", "sim_id", "installation_date", "warranty_until", "server_configuration", "created_at", "consignment_number", "courier_company", "device_condition", "sent_by_technician_id"],
+    fields: ["imei", "purchase_cost", "sale_price", "status", "has_mic", "custody_status", "custody_updated_at", "technician_id", "customer_id", "vehicle_id", "sim_id", "installation_date", "warranty_until", "server_configuration", "created_at", "consignment_number", "courier_company", "device_condition", "sent_by_technician_id", "dispatched_at", "received_at"],
     searchable: ["imei", "status", "custody_status"],
     table: "devices",
   },

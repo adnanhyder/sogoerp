@@ -18,6 +18,8 @@ type InventoryRecordActionsProps = {
   consignmentNumber?: string;
   courierCompany?: string;
   sentByTechnicianId?: string;
+  dispatchedAt?: string;
+  receivedAt?: string;
 };
 
 type TechnicianOption = {
@@ -41,6 +43,8 @@ export function InventoryRecordActions({
   consignmentNumber = "",
   courierCompany = "",
   sentByTechnicianId = "",
+  dispatchedAt = "",
+  receivedAt = "",
 }: InventoryRecordActionsProps) {
   const router = useRouter();
   const [error, setError] = useState("");
@@ -59,6 +63,8 @@ export function InventoryRecordActions({
   const [draftConsignmentNumber, setDraftConsignmentNumber] = useState(consignmentNumber);
   const [draftCourierCompany, setDraftCourierCompany] = useState(courierCompany);
   const [draftSentByTechnicianId, setDraftSentByTechnicianId] = useState(sentByTechnicianId || "");
+  const [draftDispatchedAt, setDraftDispatchedAt] = useState(dispatchedAt ? dispatchedAt.slice(0, 16) : "");
+  const [draftReceivedAt, setDraftReceivedAt] = useState(receivedAt ? receivedAt.slice(0, 16) : "");
 
   useEffect(() => {
     let ignore = false;
@@ -90,8 +96,13 @@ export function InventoryRecordActions({
       return;
     }
 
-    if (draftCustody === "on_the_way" && (!draftConsignmentNumber.trim() || !draftCourierCompany.trim())) {
-      setError("Please specify consignment number and courier company.");
+    if (draftCustody === "on_the_way" && (!draftConsignmentNumber.trim() || !draftCourierCompany.trim() || !draftDispatchedAt.trim())) {
+      setError("Please specify consignment number, courier company, and departure date/time.");
+      return;
+    }
+
+    if (draftCustody === "received_by_technician" && !draftReceivedAt.trim()) {
+      setError("Please specify the date and time the device was received.");
       return;
     }
 
@@ -111,6 +122,8 @@ export function InventoryRecordActions({
           sent_by_technician_id: draftSentByTechnicianId || null,
           consignment_number: draftConsignmentNumber || null,
           courier_company: draftCourierCompany || null,
+          dispatched_at: draftDispatchedAt ? new Date(draftDispatchedAt).toISOString() : null,
+          received_at: draftReceivedAt ? new Date(draftReceivedAt).toISOString() : null,
         },
       }),
       headers: { "Content-Type": "application/json" },
@@ -173,6 +186,8 @@ export function InventoryRecordActions({
               setDraftConsignmentNumber(consignmentNumber || "");
               setDraftCourierCompany(courierCompany || "");
               setDraftSentByTechnicianId(sentByTechnicianId || "");
+              setDraftDispatchedAt(dispatchedAt ? dispatchedAt.slice(0, 16) : "");
+              setDraftReceivedAt(receivedAt ? receivedAt.slice(0, 16) : "");
             }
             setIsEditing((open) => !open);
           }}
@@ -335,6 +350,26 @@ export function InventoryRecordActions({
                         onChange={(event) => setDraftConsignmentNumber(event.target.value)}
                         placeholder="Consignment No..."
                         value={draftConsignmentNumber}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Departure Date & Time {draftCustody === "on_the_way" && <span className="text-red-500">*</span>}</span>
+                      <DateTimePicker
+                        className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                        name="dispatched_at"
+                        onChange={(e) => setDraftDispatchedAt(e.target.value)}
+                        required={draftCustody === "on_the_way"}
+                        value={draftDispatchedAt}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Received Date & Time {draftCustody === "received_by_technician" && <span className="text-red-500">*</span>}</span>
+                      <DateTimePicker
+                        className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                        name="received_at"
+                        onChange={(e) => setDraftReceivedAt(e.target.value)}
+                        required={draftCustody === "received_by_technician"}
+                        value={draftReceivedAt}
                       />
                     </label>
                   </div>

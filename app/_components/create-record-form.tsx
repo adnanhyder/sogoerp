@@ -38,7 +38,7 @@ export function CreateRecordForm({ config, onSuccess }: CreateRecordFormProps) {
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
   const [conversationNotes, setConversationNotes] = useState("");
   const needsCustomers = config.fields.some((field) => field.type === "customer-select");
-  const needsTechnicians = config.fields.some((field) => field.type === "technician-select");
+  const needsTechnicians = config.fields.some((field) => field.type === "technician-select") || config.moduleKey === "leads";
 
   useEffect(() => {
     if (!needsTechnicians) {
@@ -128,6 +128,23 @@ export function CreateRecordForm({ config, onSuccess }: CreateRecordFormProps) {
         values[field.name] = rawVal ? new Date(rawVal).toISOString() : "";
       } else {
         values[field.name] = formData.get(field.name)?.toString() ?? "";
+      }
+    }
+
+    if (config.moduleKey === "leads") {
+      const locationVal = String(values.location || "").toLowerCase().trim();
+      if (locationVal) {
+        const cityMatch = technicians.some((tech) => {
+          if (!tech.active || !tech.cities) return false;
+          const techCities = tech.cities.split(",").map((c) => c.trim().toLowerCase());
+          return techCities.some((c) => locationVal.includes(c) || c.includes(locationVal));
+        });
+
+        if (!cityMatch) {
+          setError("Add first a technician of that city. Currently no technician found for this city.");
+          setLoading(false);
+          return;
+        }
       }
     }
 

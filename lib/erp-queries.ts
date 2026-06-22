@@ -613,8 +613,8 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
 
   const buildQuery = (withSentBy: boolean) => {
     const selectFields = withSentBy
-      ? "id,imei,status,custody_status,has_mic,purchase_cost,sale_price,installation_date,created_at,technician_id,technicians(name,phone,cities),customer_id,customers(full_name,phone,location),consignment_number,courier_company,sent_by_technician_id,sent_by:technicians!devices_sent_by_technician_id_fkey(name)"
-      : "id,imei,status,custody_status,has_mic,purchase_cost,sale_price,installation_date,created_at,technician_id,technicians(name,phone,cities),customer_id,customers(full_name,phone,location),consignment_number,courier_company";
+      ? "id,imei,status,custody_status,has_mic,purchase_cost,sale_price,installation_date,created_at,technician_id,technicians(name,phone,cities),customer_id,customers(full_name,phone,location),consignment_number,courier_company,sent_by_technician_id,sent_by:technicians!devices_sent_by_technician_id_fkey(name),dispatched_at,received_at"
+      : "id,imei,status,custody_status,has_mic,purchase_cost,sale_price,installation_date,created_at,technician_id,technicians(name,phone,cities),customer_id,customers(full_name,phone,location),consignment_number,courier_company,dispatched_at,received_at";
 
     let q = supabase
       .from("devices")
@@ -684,6 +684,8 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
       String(row.courier_company ?? ""), // 20
       sentByTechId, // 21: sent_by_technician_id
       sentByName, // 22: sent_by technician name
+      String(row.dispatched_at ?? ""), // 23: dispatched_at
+      String(row.received_at ?? ""), // 24: received_at
     ];
   });
 }
@@ -717,7 +719,7 @@ async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
 
   const rows = (data ?? []) as Record<string, unknown>[];
   const technicianIds = rows.map((row) => String(row.id ?? "")).filter(Boolean);
-  const [deviceCounts, toInstallCounts, queueCounts, disputedCounts, assignedTasks, completedCounts, unpaidCommissions] = await Promise.all([
+  const [deviceCounts, toInstallCounts, queueStats, disputedCounts, assignedTasks, completedCounts, unpaidCommissions] = await Promise.all([
     deviceCountsByTechnician(supabase, technicianIds),
     workOrderCountsByTechnician(supabase, technicianIds, ["in_progress"]),
     queuedDevicesByTechnician(supabase, technicianIds),
@@ -742,7 +744,7 @@ async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
       String(row.cities ?? "-"),
       String(row.phone ?? "-"),
       assignedTasks.get(technicianId) || "-",
-      `Devices ${formatCount(deviceCounts.get(technicianId))} / Queue ${formatCount(queueCounts.get(technicianId))} / Installed ${formatCount(completedCounts.get(technicianId))} / Unpaid Rs. ${formatCount(unpaidCommissions.get(technicianId))}`,
+      `Total ${formatCount(deviceCounts.get(technicianId))} / On Way ${formatCount(queueStats.onWay.get(technicianId))} / Received ${formatCount(queueStats.received.get(technicianId))} / Installed ${formatCount(completedCounts.get(technicianId))} / Unpaid Rs. ${formatCount(unpaidCommissions.get(technicianId))}`,
       String(row.authorization_person_name ?? "-"),
       String(row.commission_rate ?? "0"),
       technicianStatus(row.active, row.disputed),
@@ -1008,15 +1010,16 @@ async function deviceCountsByTechnician(supabase: SupabaseClient, technicianIds:
 }
 
 async function queuedDevicesByTechnician(supabase: SupabaseClient, technicianIds: string[]) {
-  const counts = new Map<string, number>();
+  const onWayCounts = new Map<string, number>();
+  const receivedCounts = new Map<string, number>();
 
   if (!technicianIds.length) {
-    return counts;
+    return { onWay: onWayCounts, received: receivedCounts };
   }
 
   const { data, error } = await supabase
     .from("devices")
-    .select("technician_id")
+    .select("technician_id, custody_status")
     .in("technician_id", technicianIds)
     .is("customer_id", null);
 
@@ -1026,10 +1029,14 @@ async function queuedDevicesByTechnician(supabase: SupabaseClient, technicianIds
 
   for (const row of data ?? []) {
     const technicianId = String(row.technician_id);
-    counts.set(technicianId, (counts.get(technicianId) ?? 0) + 1);
+    if (row.custody_status === "on_the_way") {
+      onWayCounts.set(technicianId, (onWayCounts.get(technicianId) ?? 0) + 1);
+    } else if (row.custody_status === "received_by_technician") {
+      receivedCounts.set(technicianId, (receivedCounts.get(technicianId) ?? 0) + 1);
+    }
   }
 
-  return counts;
+  return { onWay: onWayCounts, received: receivedCounts };
 }
 
 async function disputedDeviceCountsByTechnician(supabase: SupabaseClient, technicianIds: string[]) {

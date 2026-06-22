@@ -7,6 +7,8 @@ export async function DELETE(request: Request) {
   const body = (await request.json()) as {
     id?: string;
     moduleKey?: string;
+    reason?: string;
+    notes?: string;
   };
   const moduleKey = body.moduleKey as CreateModuleKey;
   const config = createConfigs[moduleKey] as CreateConfig | undefined;
@@ -48,6 +50,17 @@ export async function DELETE(request: Request) {
   }
 
   if (moduleKey === "customers") {
+    // Insert into deleted_customers_history
+    await supabase.from("deleted_customers_history").insert({
+      customer_id: record.id,
+      customer_name: record.full_name,
+      phone: record.phone,
+      location: record.location,
+      reason: body.reason || "Not specified",
+      notes: body.notes || "",
+      deleted_by: context.userId,
+    });
+
     // Fetch all work orders associated with this customer first
     const { data: workOrders } = await supabase
       .from("work_orders")
