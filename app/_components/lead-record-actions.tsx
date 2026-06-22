@@ -628,28 +628,34 @@ export function LeadRecordActions({
             {/* Form Section */}
             <form onSubmit={handleAddFollowUp} className="space-y-4">
               <label className="block">
-                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Client's Reason for Not Meeting</span>
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
+                  {followUps.length === 0 ? "Client's First Response" : "Client's Reason for Not Meeting"}
+                </span>
                 <textarea
                   className="h-20 w-full rounded-[12px] border-2 border-gray-200 p-3 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
                   onChange={(e) => setFollowUpReason(e.target.value)}
-                  placeholder="Why did the technician meeting fail? (e.g., client out of city, cancelled, not reachable...)"
+                  placeholder={followUps.length === 0 ? "What was the client's initial response to the lead?" : "Why did the technician meeting fail? (e.g., client out of city, cancelled, not reachable...)"}
                   value={followUpReason}
                   required
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Additional Admin Notes</span>
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
+                  {followUps.length === 0 ? "Admin Notes" : "Additional Admin Notes"}
+                </span>
                 <textarea
                   className="h-20 w-full rounded-[12px] border-2 border-gray-200 p-3 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
                   onChange={(e) => setFollowUpNotes(e.target.value)}
-                  placeholder="Enter additional meeting details or technician feedback..."
+                  placeholder={followUps.length === 0 ? "Enter admin notes for this lead..." : "Enter additional meeting details or technician feedback..."}
                   value={followUpNotes}
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Next Follow-up Date & Time</span>
+                <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
+                  {followUps.length === 0 ? "First Follow-up Date & Time" : "Next Follow-up Date & Time"}
+                </span>
                 <DateTimePicker
                   className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
                   onChange={setFollowUpNextAt}
@@ -682,115 +688,6 @@ export function LeadRecordActions({
                 </button>
               </div>
             </form>
-
-            <div className="my-6 h-px bg-gray-100" />
-
-            {/* Assignment Section */}
-            {(() => {
-              const localTechnicians = technicians.filter(t => {
-                if (!t.cities || !location) return false;
-                const techCities = t.cities.toLowerCase().split(',').map(c => c.trim()).filter(Boolean);
-                const loc = location.toLowerCase();
-                return techCities.some(city => loc.includes(city) || city.includes(loc));
-              });
-              
-              return (
-                <div>
-                  <h4 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider mb-4">
-                    Assign Technician & Device
-                  </h4>
-                  <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
-                    <div className="block">
-                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Assigned Technician</span>
-                      <select
-                        className="h-12 w-full appearance-none rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                        onChange={(event) => setDraftTechnicianId(event.target.value)}
-                        value={draftTechnicianId}
-                      >
-                        <option value="">-- Unassigned --</option>
-                        {localTechnicians.length > 0 ? (
-                          <optgroup label="📍 Local Technicians">
-                            {localTechnicians.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.name} ({t.deviceCount || 0} Devices)
-                              </option>
-                            ))}
-                          </optgroup>
-                        ) : (
-                          <option value="" disabled>
-                            ⚠️ No technician found for this city. Please add a technician first.
-                          </option>
-                        )}
-                      </select>
-                      {localTechnicians.length === 0 && (
-                        <p className="mt-2 text-[11px] font-bold text-amber-600">
-                          ⚠️ No technician found for city: &quot;{location}&quot;. Please register a technician for this city first under Technician Operations.
-                        </p>
-                      )}
-                    </div>
-                    <label className="block">
-                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Assign Device (IMEI)</span>
-                      <select
-                        className="h-12 w-full appearance-none rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                        onChange={(event) => setDraftDeviceId(event.target.value)}
-                        value={draftDeviceId}
-                      >
-                        <option value="">-- Unassigned --</option>
-                        {assignedDeviceId ? (
-                          <option value={assignedDeviceId}>{assignedDeviceImei} (Current)</option>
-                        ) : null}
-                        {devices
-                          .filter(d => draftTechnicianId ? (d.technician_id === draftTechnicianId || !d.technician_id) : true)
-                          .map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.imei} {d.technician_id ? `(Held by ${d.technicianName})` : "(Office Stock)"}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {(() => {
-                      const selectedDevice = devices.find((d) => d.id === draftDeviceId);
-                      if (selectedDevice && !selectedDevice.technician_id) {
-                        return (
-                          <>
-                            <label className="block">
-                              <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Courier Company *</span>
-                              <input
-                                className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D]"
-                                onChange={(event) => setDraftCourierCompany(event.target.value)}
-                                value={draftCourierCompany}
-                                placeholder="e.g. TCS, Leopard..."
-                              />
-                            </label>
-                            <label className="block">
-                              <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Consignment Number *</span>
-                              <input
-                                className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D]"
-                                onChange={(event) => setDraftConsignmentNumber(event.target.value)}
-                                value={draftConsignmentNumber}
-                                placeholder="Tracking ID"
-                              />
-                            </label>
-                          </>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      onClick={saveAssignment}
-                      disabled={busy}
-                      className="inline-flex h-12 items-center justify-center gap-2 rounded-[12px] bg-black px-8 text-sm font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#343434] hover:shadow-lg focus:ring-4 focus:ring-black/30 disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0"
-                      type="button"
-                    >
-                      {isSavingAssignment ? <LoadingSpinner className="size-4" /> : null}
-                      {isSavingAssignment ? "Saving..." : "Save Assignment"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })()}
 
             <div className="my-6 h-px bg-gray-100" />
 

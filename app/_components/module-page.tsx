@@ -332,9 +332,7 @@ export function ModulePage({
 
 
 
-          {isTechnicians && (
-            <PaidCommissionsTable />
-          )}
+          {/* Technicians commission table has been moved to /technicians/payroll */}
 
           {isCustomers && completedCustomers.length > 0 ? (
             <CompletedCustomersTable columns={tableColumns} rows={completedCustomers} />

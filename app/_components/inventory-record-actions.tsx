@@ -209,7 +209,7 @@ export function InventoryRecordActions({
 
       {isEditing ? (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
-          <div className="w-full max-w-[500px] rounded-[24px] bg-white p-8 shadow-2xl animate-[slideUpFade_0.3s_ease-out_both] max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-[640px] rounded-[24px] bg-white p-8 shadow-2xl animate-[slideUpFade_0.3s_ease-out_both] max-h-[90vh] overflow-y-auto">
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Edit Inventory Device</h3>
@@ -282,26 +282,11 @@ export function InventoryRecordActions({
                 <p className="mb-3 text-[11px] font-extrabold uppercase tracking-wider text-[#b58b29]">📦 Device Transfer / Assignment</p>
                 <div className="grid gap-4 sm:grid-cols-2">
 
-                  {/* Sent By (the technician dispatching the device) */}
-                  <label className="block">
-                    <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Sent By (Technician)</span>
-                    <select
-                      className="h-12 w-full rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                      onChange={(event) => setDraftSentByTechnicianId(event.target.value)}
-                      value={draftSentByTechnicianId}
-                    >
-                      <option value="">Company / No technician</option>
-                      {technicians.map((technician) => (
-                        <option key={technician.id} value={technician.id}>
-                          {technician.name} / {technician.cities || "No city"}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  {/* Received By (the technician receiving the device) */}
-                  <label className="block">
-                    <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Received By (Technician)</span>
+                  {/* Assigned To (the technician receiving the device) */}
+                  <label className="block sm:col-span-2">
+                    <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
+                      {draftCustody === "received_by_technician" ? "Received By (Technician)" : "Assigned To (Technician)"}
+                    </span>
                     <select
                       className="h-12 w-full rounded-[12px] border-2 border-gray-200 bg-white px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
                       onChange={(event) => {
@@ -332,47 +317,55 @@ export function InventoryRecordActions({
                     ) : null}
                   </label>
 
-                  {/* Courier info — always shown so data isn't lost, but only required when on_the_way */}
-                  <div className="space-y-4 pt-2">
+                  {/* Courier info — only shown when dispatching */}
+                  {draftCustody !== "received_by_technician" && (
+                    <div className="sm:col-span-2 pt-2">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Courier Company {draftCustody === "on_the_way" && <span className="text-red-500">*</span>}</span>
+                          <input
+                            className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                            onChange={(event) => setDraftCourierCompany(event.target.value)}
+                            placeholder="e.g. TCS, Leopard, Trax"
+                            value={draftCourierCompany}
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Consignment Number {draftCustody === "on_the_way" && <span className="text-red-500">*</span>}</span>
+                          <input
+                            className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                            onChange={(event) => setDraftConsignmentNumber(event.target.value)}
+                            placeholder="Consignment No..."
+                            value={draftConsignmentNumber}
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Departure Date & Time {draftCustody === "on_the_way" && <span className="text-red-500">*</span>}</span>
+                          <DateTimePicker
+                            className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                            name="dispatched_at"
+                            onChange={setDraftDispatchedAt}
+                            required={draftCustody === "on_the_way"}
+                            value={draftDispatchedAt}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Received Date — only shown when received */}
+                  {draftCustody === "received_by_technician" && (
                     <label className="block">
-                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Courier Company {draftCustody === "on_the_way" && <span className="text-red-500">*</span>}</span>
-                      <input
-                        className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                        onChange={(event) => setDraftCourierCompany(event.target.value)}
-                        placeholder="e.g. TCS, Leopard, Trax"
-                        value={draftCourierCompany}
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Consignment Number {draftCustody === "on_the_way" && <span className="text-red-500">*</span>}</span>
-                      <input
-                        className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                        onChange={(event) => setDraftConsignmentNumber(event.target.value)}
-                        placeholder="Consignment No..."
-                        value={draftConsignmentNumber}
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Departure Date & Time {draftCustody === "on_the_way" && <span className="text-red-500">*</span>}</span>
-                      <DateTimePicker
-                        className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
-                        name="dispatched_at"
-                        onChange={(e) => setDraftDispatchedAt(e.target.value)}
-                        required={draftCustody === "on_the_way"}
-                        value={draftDispatchedAt}
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Received Date & Time {draftCustody === "received_by_technician" && <span className="text-red-500">*</span>}</span>
+                      <span className="mb-1.5 block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">Received Date & Time <span className="text-red-500">*</span></span>
                       <DateTimePicker
                         className="h-12 w-full rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 outline-none transition-all focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
                         name="received_at"
-                        onChange={(e) => setDraftReceivedAt(e.target.value)}
-                        required={draftCustody === "received_by_technician"}
+                        onChange={setDraftReceivedAt}
+                        required={true}
                         value={draftReceivedAt}
                       />
                     </label>
-                  </div>
+                  )}
                 </div>
               </div>
               
@@ -386,16 +379,17 @@ export function InventoryRecordActions({
                   value={draftPurchaseCost}
                 />
               </label>
-              
-              <label className="flex h-12 items-center gap-3 rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 cursor-pointer hover:bg-gray-50 transition-colors">
-                <input
-                  checked={draftHasMic}
-                  className="size-5 accent-[#FAC54D] rounded text-[#FAC54D] focus:ring-[#FAC54D]"
-                  onChange={(event) => setDraftHasMic(event.target.checked)}
-                  type="checkbox"
-                />
-                With Mic
-              </label>
+              <div className="flex flex-col justify-end">
+                <label className="flex h-12 items-center gap-3 rounded-[12px] border-2 border-gray-200 px-4 text-sm font-bold text-gray-900 cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input
+                    checked={draftHasMic}
+                    className="size-5 accent-[#FAC54D] rounded text-[#FAC54D] focus:ring-[#FAC54D]"
+                    onChange={(event) => setDraftHasMic(event.target.checked)}
+                    type="checkbox"
+                  />
+                  With Mic
+                </label>
+              </div>
             </div>
             
             {error && (

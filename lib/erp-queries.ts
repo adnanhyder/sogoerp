@@ -466,73 +466,115 @@ export async function getModuleData(
 ): Promise<QueryResult<ModuleData>> {
   try {
     switch (key) {
-      case "inventory":
+      case "inventory": {
+        const [total, companyHands, onTheWay, withTechnicians, faulty, installed, tableRows] = await Promise.all([
+          countRows(supabase, "devices"),
+          countRows(supabase, "devices", (query) => query.eq("custody_status", "company_hands")),
+          countRows(supabase, "devices", (query) => query.eq("custody_status", "on_the_way")),
+          countRows(supabase, "devices", (query) => query.eq("custody_status", "received_by_technician")),
+          countRows(supabase, "devices", (query) => query.eq("status", "faulty")),
+          countRows(supabase, "devices", (query) => query.eq("status", "installed")),
+          inventoryRows(supabase, options.searchQuery)
+        ]);
         return {
           data: {
             metrics: [
-              { label: "Total Stock", value: formatCount(await countRows(supabase, "devices")), detail: "All device records" },
-              { label: "Company Hands", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("custody_status", "company_hands"))), detail: "Devices still with company" },
-              { label: "On The Way", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("custody_status", "on_the_way"))), detail: "Courier / technician handoff" },
-              { label: "With Technicians", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("custody_status", "received_by_technician"))), detail: "Received by technicians" },
-              { label: "Faulty", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("status", "faulty"))), detail: "Pending replacement" },
-              { label: "Installed Devices", value: formatCount(await countRows(supabase, "devices", (query) => query.eq("status", "installed"))), detail: "Successfully installed" },
+              { label: "Total Stock", value: formatCount(total), detail: "All device records" },
+              { label: "Company Hands", value: formatCount(companyHands), detail: "Devices still with company" },
+              { label: "On The Way", value: formatCount(onTheWay), detail: "Courier / technician handoff" },
+              { label: "With Technicians", value: formatCount(withTechnicians), detail: "Received by technicians" },
+              { label: "Faulty", value: formatCount(faulty), detail: "Pending replacement" },
+              { label: "Installed Devices", value: formatCount(installed), detail: "Successfully installed" },
             ],
-            rows: await inventoryRows(supabase, options.searchQuery),
+            rows: tableRows,
           },
           error: null,
         };
-      case "integrations":
+      }
+      case "integrations": {
+        const [apiSources, inboundEvents, importJobs, exportJobs, tableRows] = await Promise.all([
+          countRows(supabase, "api_sources"),
+          countRows(supabase, "inbound_events"),
+          countRows(supabase, "import_jobs"),
+          countRows(supabase, "export_jobs"),
+          tableRowsQuery(supabase, "api_sources", ["name", "source_key", "active", "created_at"], options.searchQuery)
+        ]);
         return {
           data: {
             metrics: [
-              { label: "API Sources", value: formatCount(await countRows(supabase, "api_sources")), detail: "External apps registered" },
-              { label: "Inbound Events", value: formatCount(await countRows(supabase, "inbound_events")), detail: "Payloads received" },
-              { label: "Import Jobs", value: formatCount(await countRows(supabase, "import_jobs")), detail: "CSV/XLSX batches" },
-              { label: "Export Jobs", value: formatCount(await countRows(supabase, "export_jobs")), detail: "Generated files" },
+              { label: "API Sources", value: formatCount(apiSources), detail: "External apps registered" },
+              { label: "Inbound Events", value: formatCount(inboundEvents), detail: "Payloads received" },
+              { label: "Import Jobs", value: formatCount(importJobs), detail: "CSV/XLSX batches" },
+              { label: "Export Jobs", value: formatCount(exportJobs), detail: "Generated files" },
             ],
-            rows: await tableRows(supabase, "api_sources", ["name", "source_key", "active", "created_at"], options.searchQuery),
+            rows: tableRows,
           },
           error: null,
         };
-      case "leads":
+      }
+      case "leads": {
+        const [newLeads, followUpsDue, matured, total, tableRows] = await Promise.all([
+          countRows(supabase, "leads", (query) => query.eq("stage", "new_lead")),
+          countRows(supabase, "leads", (query) => query.lte("next_follow_up_at", new Date().toISOString())),
+          countRows(supabase, "leads", (query) => query.eq("stage", "matured")),
+          countRows(supabase, "leads"),
+          leadRows(supabase, options.searchQuery)
+        ]);
         return {
           data: {
             metrics: [
-              { label: "New Leads", value: formatCount(await countRows(supabase, "leads", (query) => query.eq("stage", "new_lead"))), detail: "Fresh inquiries" },
-              { label: "Follow-ups Due", value: formatCount(await countRows(supabase, "leads", (query) => query.lte("next_follow_up_at", new Date().toISOString()))), detail: "Due now or overdue" },
-              { label: "Matured Leads", value: formatCount(await countRows(supabase, "leads", (query) => query.eq("stage", "matured"))), detail: "Ready to schedule" },
-              { label: "Total Leads", value: formatCount(await countRows(supabase, "leads")), detail: "All lead records" },
+              { label: "New Leads", value: formatCount(newLeads), detail: "Fresh inquiries" },
+              { label: "Follow-ups Due", value: formatCount(followUpsDue), detail: "Due now or overdue" },
+              { label: "Matured Leads", value: formatCount(matured), detail: "Ready to schedule" },
+              { label: "Total Leads", value: formatCount(total), detail: "All lead records" },
             ],
-            rows: await leadRows(supabase, options.searchQuery),
+            rows: tableRows,
           },
           error: null,
         };
-      case "technicians":
+      }
+      case "technicians": {
+        const [total, active, blocked, disputed, tableRows] = await Promise.all([
+          countRows(supabase, "technicians"),
+          countRows(supabase, "technicians", (query) => query.eq("active", true)),
+          countRows(supabase, "technicians", (query) => query.eq("active", false)),
+          countRows(supabase, "technicians", (query) => query.eq("disputed", true)),
+          technicianRows(supabase, options.searchQuery)
+        ]);
         return {
           data: {
             metrics: [
-              { label: "Technicians", value: formatCount(await countRows(supabase, "technicians")), detail: "All technician records" },
-              { label: "Active", value: formatCount(await countRows(supabase, "technicians", (query) => query.eq("active", true))), detail: "Allowed to receive work" },
-              { label: "Blocked", value: formatCount(await countRows(supabase, "technicians", (query) => query.eq("active", false))), detail: "Access blocked" },
-              { label: "Disputed", value: formatCount(await countRows(supabase, "technicians", (query) => query.eq("disputed", true))), detail: "Marked for review" },
+              { label: "Technicians", value: formatCount(total), detail: "All technician records" },
+              { label: "Active", value: formatCount(active), detail: "Allowed to receive work" },
+              { label: "Blocked", value: formatCount(blocked), detail: "Access blocked" },
+              { label: "Disputed", value: formatCount(disputed), detail: "Marked for review" },
             ],
-            rows: await technicianRows(supabase, options.searchQuery),
+            rows: tableRows,
           },
           error: null,
         };
-      case "customers":
+      }
+      case "customers": {
+        const [total, meetingsDue, scheduled, completed, tableRows] = await Promise.all([
+          countRows(supabase, "customers"),
+          countRows(supabase, "customer_meetings", (query) => query.lte("scheduled_at", new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()).in("status", ["scheduled", "rescheduled"])),
+          countRows(supabase, "customer_meetings", (query) => query.in("status", ["scheduled", "rescheduled"])),
+          countRows(supabase, "work_orders", (query) => query.eq("status", "completed")),
+          customerRows(supabase, options.searchQuery)
+        ]);
         return {
           data: {
             metrics: [
-              { label: "Customers", value: formatCount(await countRows(supabase, "customers")), detail: "All customer records" },
-              { label: "Meetings Due", value: formatCount(await countRows(supabase, "customer_meetings", (query) => query.lte("scheduled_at", new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()).in("status", ["scheduled", "rescheduled"]))), detail: "Due within 24 hours" },
-              { label: "Scheduled", value: formatCount(await countRows(supabase, "customer_meetings", (query) => query.in("status", ["scheduled", "rescheduled"]))), detail: "Open technician meetings" },
-              { label: "Completed", value: formatCount(await countRows(supabase, "work_orders", (query) => query.eq("status", "completed"))), detail: "Completed installations" },
+              { label: "Customers", value: formatCount(total), detail: "All customer records" },
+              { label: "Meetings Due", value: formatCount(meetingsDue), detail: "Due within 24 hours" },
+              { label: "Scheduled", value: formatCount(scheduled), detail: "Open technician meetings" },
+              { label: "Completed", value: formatCount(completed), detail: "Completed installations" },
             ],
-            rows: await customerRows(supabase, options.searchQuery),
+            rows: tableRows,
           },
           error: null,
         };
+      }
       case "simConfig":
         return moduleQuery(supabase, "sims", ["sim_number", "network_provider", "apn_settings", "activation_date", "active"], options.searchQuery);
       case "finance":
@@ -551,19 +593,27 @@ export async function getModuleData(
         return moduleQuery(supabase, "report_definitions", ["name", "focus", "owner", "frequency", "status"], options.searchQuery);
       case "tracking":
         return moduleQuery(supabase, "tracking_events", ["entity", "location", "signal", "last_update", "status"], options.searchQuery);
-      case "settings":
+      case "settings": {
+        const [settings, apiSourcesSettings, inboundEventsSettings, importJobsSettings, tableRows] = await Promise.all([
+          countRows(supabase, "settings_items"),
+          countRows(supabase, "api_sources"),
+          countRows(supabase, "inbound_events"),
+          countRows(supabase, "import_jobs"),
+          tableRowsQuery(supabase, "settings_items", ["name", "area", "owner", "created_at", "status"], options.searchQuery)
+        ]);
         return {
           data: {
             metrics: [
-              { label: "Settings", value: formatCount(await countRows(supabase, "settings_items")), detail: "Configuration records" },
-              { label: "API Sources", value: formatCount(await countRows(supabase, "api_sources")), detail: "External POST senders" },
-              { label: "Inbound Events", value: formatCount(await countRows(supabase, "inbound_events")), detail: "Received payloads" },
-              { label: "Import Jobs", value: formatCount(await countRows(supabase, "import_jobs")), detail: "CSV/XLSX batches" },
+              { label: "Settings", value: formatCount(settings), detail: "Configuration records" },
+              { label: "API Sources", value: formatCount(apiSourcesSettings), detail: "External POST senders" },
+              { label: "Inbound Events", value: formatCount(inboundEventsSettings), detail: "Received payloads" },
+              { label: "Import Jobs", value: formatCount(importJobsSettings), detail: "CSV/XLSX batches" },
             ],
-            rows: await tableRows(supabase, "settings_items", ["name", "area", "owner", "created_at", "status"], options.searchQuery),
+            rows: tableRows,
           },
           error: null,
         };
+      }
       default:
         return {
           data: {
@@ -830,7 +880,8 @@ function technicianMatchScore(customerLocation: string, technician: Record<strin
 async function customerRows(supabase: SupabaseClient, searchQuery = "") {
   let query = supabase
     .from("customers")
-    .select("id,full_name,phone,whatsapp,email,address,area,location,vehicle_type,budget,notes,source_lead_id,created_at,leads!source_lead_id(assigned_technician_id,assigned_device_id,technicians(name))")
+    .select("id,full_name,phone,whatsapp,email,address,area,location,vehicle_type,budget,notes,source_lead_id,created_at,leads!source_lead_id(assigned_technician_id,assigned_device_id,technicians(name),devices(imei))")
+    .eq("status", "active")
     .order("created_at", { ascending: false });
 
   const trimmedSearch = searchQuery.trim();
@@ -881,6 +932,8 @@ async function customerRows(supabase: SupabaseClient, searchQuery = "") {
     const assignedTechnicianId = leadsData?.assigned_technician_id ? String(leadsData.assigned_technician_id) : "";
     const assignedDeviceId = leadsData?.assigned_device_id ? String(leadsData.assigned_device_id) : "";
     const assignedTechnicianName = leadsData ? (relatedField(leadsData.technicians, "name") ?? "") : "";
+    const leadDeviceData = leadsData?.devices as Record<string, unknown> | null;
+    const leadAssignedDeviceImei = leadDeviceData?.imei ? String(leadDeviceData.imei) : "";
 
     return [
       customerId, // 0
@@ -899,7 +952,7 @@ async function customerRows(supabase: SupabaseClient, searchQuery = "") {
       formatDateTime(String(row.created_at ?? "")), // 13
       installStatuses.get(customerId)?.status ?? "none", // 14 - raw status: "completed", "pending", or "none"
       String(row.source_lead_id ?? ""), // 15
-      assignedDevices.get(customerId) || "-", // 16
+      assignedDevices.get(customerId) || leadAssignedDeviceImei || "-", // 16
       assignedTechnicianId, // 17
       assignedDeviceId, // 18
       assignedTechnicianName, // 19: technician name who installed

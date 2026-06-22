@@ -43,6 +43,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: leadsError.message }, { status: 400 });
   }
 
+  // Fetch incoming device transfers
+  const { data: transfers, error: transfersError } = await supabase
+    .from("device_transfers")
+    .select("id, courier_name, tracking_number, departed_at, status, device_id, devices(imei), from_technician_id, technicians!device_transfers_from_technician_id_fkey(name)")
+    .eq("to_technician_id", technicianId)
+    .eq("status", "in_transit")
+    .order("created_at", { ascending: false });
+
+  if (transfersError) {
+    return NextResponse.json({ error: transfersError.message }, { status: 400 });
+  }
+
   return NextResponse.json({
     devices: (devices ?? []).map((d) => {
       const customer = d.customers as unknown as Record<string, unknown> | null;
@@ -72,6 +84,20 @@ export async function GET(request: Request) {
         deviceCustody: device ? String(device.custody_status ?? "") : "",
         deviceCourier: device ? String(device.courier_company ?? "") : "",
         deviceConsignment: device ? String(device.consignment_number ?? "") : "",
+      };
+    }),
+    incomingTransfers: (transfers ?? []).map((t) => {
+      const device = t.devices as unknown as Record<string, unknown> | null;
+      const fromTech = t.technicians as unknown as Record<string, unknown> | null;
+      return {
+        id: t.id,
+        deviceId: t.device_id,
+        deviceImei: device ? String(device.imei ?? "") : "",
+        fromTechnicianName: fromTech ? String(fromTech.name ?? "") : "",
+        courierName: t.courier_name,
+        trackingNumber: t.tracking_number ?? "",
+        departedAt: t.departed_at,
+        status: t.status,
       };
     }),
   });

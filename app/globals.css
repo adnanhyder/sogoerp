@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #d2d2d2;
+  --background: #fbfbfb;
   --foreground: #343434;
   --surface: #ffffff;
   --surface-soft: #fbfbfb;
@@ -25,11 +25,11 @@
 
 html {
   min-height: 100%;
-  background: var(--background);
+  background: var(--surface-soft);
 }
 
 body {
-  background: var(--background);
+  background: var(--surface-soft);
   color: var(--foreground);
   font-family: var(--font-general-sans), "General Sans", Arial, Helvetica, sans-serif;
 }

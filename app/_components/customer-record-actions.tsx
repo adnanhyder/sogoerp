@@ -246,7 +246,8 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
         id: customerId,
         moduleKey: "customers",
         reason: deleteReason,
-        notes: deleteReason === "Other" ? deleteNotes : "",
+        notes: deleteReason === "Other" ? deleteNotes.replace("[FAILED] ", "") : "",
+        status: deleteNotes.includes("[FAILED]") ? "failed" : "deleted",
       }),
       headers: { "Content-Type": "application/json" },
       method: "DELETE",
@@ -640,6 +641,40 @@ export function CustomerRecordActions({ customerId, installStatus = "none", loca
             </div>
 
             <div className="space-y-4">
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-gray-500">Action Type</span>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="deleteStatus" 
+                      value="deleted" 
+                      checked={!deleteNotes.includes("[FAILED]")}
+                      onChange={() => {
+                        setDeleteNotes(deleteNotes.replace("[FAILED] ", ""));
+                      }}
+                      className="accent-red-600 size-4" 
+                    />
+                    <span className="text-sm font-bold text-gray-900">Deleted</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="deleteStatus" 
+                      value="failed" 
+                      checked={deleteNotes.includes("[FAILED]")}
+                      onChange={() => {
+                        if (!deleteNotes.includes("[FAILED]")) {
+                          setDeleteNotes("[FAILED] " + deleteNotes);
+                        }
+                      }}
+                      className="accent-red-600 size-4" 
+                    />
+                    <span className="text-sm font-bold text-gray-900">Failed</span>
+                  </label>
+                </div>
+              </label>
+
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-gray-500">Reason</span>
                 <select

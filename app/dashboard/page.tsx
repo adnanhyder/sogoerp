@@ -130,8 +130,8 @@ export default async function DashboardPage() {
         </section>
 
         <section className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.9fr)]">
-          <div className="space-y-3">
-            <article className="rounded-[16px] border border-gray-100 bg-white shadow-sm ring-1 ring-gray-100/50">
+          <div className="space-y-3 min-w-0">
+            <article className="overflow-hidden rounded-[16px] border border-gray-100 bg-white shadow-sm ring-1 ring-gray-100/50">
               <div className="flex flex-col gap-4 px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
                 <div>
                   <h2 className="text-lg font-bold text-black">Fleet Activity</h2>
@@ -155,7 +155,7 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
-              <div className="px-3 sm:px-6">
+              <div className="px-3 sm:px-6 w-full overflow-hidden">
                 <svg
                   aria-label="Fleet activity chart"
                   className="h-[260px] w-full"
@@ -278,7 +278,7 @@ export default async function DashboardPage() {
             </article>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 min-w-0">
             <article className="rounded-[16px] border border-gray-100 bg-white p-6 sm:p-8 shadow-sm ring-1 ring-gray-100/50">
               <h2 className="text-lg font-bold text-black">Lead Funnel</h2>
               <div className="mt-5 space-y-3">

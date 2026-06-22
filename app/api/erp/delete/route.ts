@@ -9,6 +9,7 @@ export async function DELETE(request: Request) {
     moduleKey?: string;
     reason?: string;
     notes?: string;
+    status?: "failed" | "deleted";
   };
   const moduleKey = body.moduleKey as CreateModuleKey;
   const config = createConfigs[moduleKey] as CreateConfig | undefined;
@@ -50,8 +51,8 @@ export async function DELETE(request: Request) {
   }
 
   if (moduleKey === "customers") {
-    // Insert into deleted_customers_history
-    await supabase.from("deleted_customers_history").insert({
+    // Insert into customer_records_history
+    await supabase.from("customer_records_history").insert({
       customer_id: record.id,
       customer_name: record.full_name,
       phone: record.phone,
@@ -59,6 +60,7 @@ export async function DELETE(request: Request) {
       reason: body.reason || "Not specified",
       notes: body.notes || "",
       deleted_by: context.userId,
+      status: body.status || "deleted",
     });
 
     // Fetch all work orders associated with this customer first

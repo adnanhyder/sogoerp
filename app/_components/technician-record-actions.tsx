@@ -48,6 +48,17 @@ type ConnectedLead = {
   deviceConsignment: string;
 };
 
+type IncomingTransfer = {
+  id: string;
+  deviceId: string;
+  deviceImei: string;
+  fromTechnicianName: string;
+  courierName: string;
+  trackingNumber: string;
+  departedAt: string;
+  status: string;
+};
+
 type TechnicianRecordActionsProps = {
   active: boolean;
   authorizationPersonCnic: string;
@@ -108,6 +119,13 @@ export function TechnicianRecordActions({
   const [isLoadingConnected, setIsLoadingConnected] = useState(false);
   const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>([]);
   const [connectedLeads, setConnectedLeads] = useState<ConnectedLead[]>([]);
+  const [incomingTransfers, setIncomingTransfers] = useState<IncomingTransfer[]>([]);
+
+  // Transfer Device Modal State
+  const [transferDevice, setTransferDevice] = useState<ConnectedDevice | null>(null);
+  const [transferTechnicians, setTransferTechnicians] = useState<{id: string, name: string}[]>([]);
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [isReceiving, setIsReceiving] = useState<string | null>(null);
   const [draftName, setDraftName] = useState(name);
   const [draftCnic, setDraftCnic] = useState(cnic === "-" ? "" : cnic);
   const [draftPhone, setDraftPhone] = useState(phone === "-" ? "" : phone);
@@ -141,14 +159,74 @@ export function TechnicianRecordActions({
     setIsLoadingConnected(true);
     try {
       const res = await fetch(`/api/erp/technicians/connected?technicianId=${id}`);
-      const payload = (await res.json()) as { devices?: ConnectedDevice[]; leads?: ConnectedLead[]; error?: string };
+      const payload = (await res.json()) as { devices?: ConnectedDevice[]; leads?: ConnectedLead[]; incomingTransfers?: IncomingTransfer[]; error?: string };
       if (!res.ok) throw new Error(payload.error ?? "Failed to load connected data");
       setConnectedDevices(payload.devices ?? []);
       setConnectedLeads(payload.leads ?? []);
+      setIncomingTransfers(payload.incomingTransfers ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error loading connected data");
     } finally {
       setIsLoadingConnected(false);
+    }
+  }
+
+  async function openTransferModal(device: ConnectedDevice) {
+    setTransferDevice(device);
+    try {
+      const res = await fetch("/api/erp/technicians/active");
+      const data = await res.json();
+      if (res.ok && data.technicians) {
+        setTransferTechnicians(data.technicians.filter((t: any) => t.id !== id));
+      }
+    } catch (e) {
+      console.error("Failed to load technicians", e);
+    }
+  }
+
+  async function handleTransfer(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!transferDevice) return;
+    setIsTransferring(true);
+    const formData = new FormData(e.currentTarget);
+    try {
+      const res = await fetch("/api/erp/technicians/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceId: transferDevice.id,
+          fromTechnicianId: id,
+          toTechnicianId: formData.get("toTechnicianId"),
+          courierName: formData.get("courierName"),
+          trackingNumber: formData.get("trackingNumber"),
+          departedAt: formData.get("departedAt"),
+        })
+      });
+      if (!res.ok) throw new Error("Failed to transfer device");
+      setTransferDevice(null);
+      fetchConnectedData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Error transferring device");
+    } finally {
+      setIsTransferring(false);
+    }
+  }
+
+  async function handleReceiveTransfer(transferId: string) {
+    if (!confirm("Confirm you have received this device?")) return;
+    setIsReceiving(transferId);
+    try {
+      const res = await fetch("/api/erp/technicians/receive-transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transferId, receivedAt: new Date().toISOString() })
+      });
+      if (!res.ok) throw new Error("Failed to receive device");
+      fetchConnectedData();
+    } catch(err) {
+      alert("Error receiving device");
+    } finally {
+      setIsReceiving(null);
     }
   }
 
@@ -701,6 +779,52 @@ export function TechnicianRecordActions({
                 </div>
               ) : (
                 <>
+                  {/* Incoming Transfers Section */}
+                  {incomingTransfers.length > 0 && (
+                    <div className="mb-6">
+                      <p className="mb-3 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wider text-blue-500">
+                        <Truck className="size-3.5" /> Incoming Transfers ({incomingTransfers.length})
+                      </p>
+                      <div className="space-y-2">
+                        {incomingTransfers.map((transfer) => (
+                          <div key={transfer.id} className="rounded-[12px] border-2 border-blue-200 bg-blue-50 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm font-black text-gray-900 flex items-center gap-2">
+                                  IMEI: {transfer.deviceImei}
+                                  <span className="inline-flex items-center rounded-full bg-blue-200 px-2 py-0.5 text-[10px] font-extrabold uppercase text-blue-800">
+                                    IN TRANSIT
+                                  </span>
+                                </span>
+                                <p className="mt-1 text-xs font-semibold text-gray-600">
+                                  From: {transfer.fromTechnicianName}
+                                </p>
+                                <div className="mt-2 rounded-[8px] bg-blue-100 border border-blue-200 px-3 py-2">
+                                  <p className="text-[11px] font-extrabold text-blue-800 uppercase tracking-wider mb-1">🚚 Courier Details</p>
+                                  <p className="text-xs font-bold text-blue-900">Courier: {transfer.courierName}</p>
+                                  {transfer.trackingNumber && (
+                                    <p className="text-xs font-bold text-blue-900">Tracking: {transfer.trackingNumber}</p>
+                                  )}
+                                  {transfer.departedAt && (
+                                    <p className="text-xs font-bold text-blue-900">Departed: {new Date(transfer.departedAt).toLocaleDateString()}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleReceiveTransfer(transfer.id)}
+                                disabled={isReceiving === transfer.id}
+                                className="shrink-0 rounded-[8px] bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-1.5 shadow-sm"
+                              >
+                                {isReceiving === transfer.id ? <LoadingSpinner className="size-3.5 text-white" /> : <CheckCircle2 className="size-3.5" />}
+                                Mark Received
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Devices Section */}
                   <div>
                     <p className="mb-3 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wider text-gray-500">
@@ -763,6 +887,15 @@ export function TechnicianRecordActions({
                                     </div>
                                   )}
                                 </div>
+                                {!isOnWay && !isInstalled && (
+                                  <button
+                                    onClick={() => openTransferModal(device)}
+                                    className="shrink-0 rounded-[8px] border-2 border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition flex items-center gap-1.5"
+                                  >
+                                    <Truck className="size-3.5" />
+                                    Transfer
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
@@ -847,6 +980,95 @@ export function TechnicianRecordActions({
           </div>
         </div>
       )}
+
+      {/* Transfer Device Modal */}
+      {transferDevice && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="w-full max-w-[480px] rounded-[24px] bg-white shadow-2xl animate-[slideUpFade_0.3s_ease-out_both] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-[#fbfbfb]">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Transfer Device</h3>
+                <p className="text-sm font-medium text-gray-500 mt-1">Re-assign via Courier</p>
+              </div>
+              <button
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-200 hover:text-gray-900 transition-colors"
+                onClick={() => setTransferDevice(null)}
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <form onSubmit={handleTransfer} className="p-6">
+              <div className="mb-6 rounded-[12px] bg-blue-50 border border-blue-100 p-4">
+                <p className="text-xs font-extrabold uppercase tracking-wider text-blue-500 mb-1">Device to Transfer</p>
+                <p className="text-sm font-black text-blue-900">IMEI: {transferDevice.imei}</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Destination Technician *</label>
+                  <select
+                    name="toTechnicianId"
+                    required
+                    className="w-full rounded-[10px] border-2 border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-900 outline-none transition focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  >
+                    <option value="">Select Technician...</option>
+                    {transferTechnicians.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Courier Company *</label>
+                  <input
+                    type="text"
+                    name="courierName"
+                    required
+                    placeholder="e.g. Leopard, TCS"
+                    className="w-full rounded-[10px] border-2 border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-900 outline-none transition focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Tracking / Consignment #</label>
+                  <input
+                    type="text"
+                    name="trackingNumber"
+                    placeholder="Optional tracking number"
+                    className="w-full rounded-[10px] border-2 border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-900 outline-none transition focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Departed Date</label>
+                  <input
+                    type="date"
+                    name="departedAt"
+                    defaultValue={new Date().toISOString().split('T')[0]}
+                    className="w-full rounded-[10px] border-2 border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-900 outline-none transition focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-8 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTransferDevice(null)}
+                  className="flex-1 rounded-[12px] border-2 border-gray-200 bg-white py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isTransferring}
+                  className="flex-1 rounded-[12px] bg-[#FAC54D] py-3 text-sm font-bold text-gray-900 transition hover:bg-[#e0b040] disabled:opacity-50 disabled:cursor-wait flex items-center justify-center gap-2 shadow-sm"
+                >
+                  {isTransferring ? <LoadingSpinner className="size-4" /> : <Truck className="size-4" />}
+                  Transfer Device
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
 
       <AlertModal
         isOpen={isDeleteModalOpen}

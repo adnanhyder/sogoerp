@@ -88,7 +88,7 @@ export async function POST(request: Request) {
   // Fetch customer's primary vehicle if they have one and the source lead
   const { data: customer } = await supabase
     .from("customers")
-    .select("source_lead_id")
+    .select("source_lead_id, full_name, phone, location")
     .eq("id", body.customerId)
     .single();
 
@@ -236,6 +236,21 @@ export async function POST(request: Request) {
       record_label: `Marked as won after installation of ${device.imei ?? "device"}`,
     });
   }
+
+  // Update customer status to completed
+  await supabase.from("customers").update({ status: "completed" }).eq("id", body.customerId);
+
+  // Insert Success record
+  await supabase.from("customer_records_history").insert({
+    customer_id: body.customerId,
+    customer_name: customer?.full_name || "Unknown",
+    phone: customer?.phone || "",
+    location: customer?.location || "",
+    reason: "Installation Completed",
+    notes: `Installed device ${device.imei} by technician ${technician.name}`,
+    deleted_by: context.userId,
+    status: "success",
+  });
 
   return NextResponse.json({ ok: true });
 }
