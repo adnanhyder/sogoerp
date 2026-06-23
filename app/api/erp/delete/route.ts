@@ -109,7 +109,7 @@ export async function DELETE(request: Request) {
               customer_id: null,
               vehicle_id: null,
               installation_date: null,
-              sale_price: null,
+              sale_price: 0,
             })
             .eq("id", device.id);
         })
@@ -200,7 +200,7 @@ export async function DELETE(request: Request) {
                 customer_id: null,
                 vehicle_id: null,
                 installation_date: null,
-                sale_price: null,
+                sale_price: 0,
               })
               .eq("id", device.id);
           })
@@ -329,7 +329,7 @@ export async function DELETE(request: Request) {
               customer_id: null,
               vehicle_id: null,
               installation_date: null,
-              sale_price: null,
+              sale_price: 0,
             })
             .eq("id", device.id);
         })

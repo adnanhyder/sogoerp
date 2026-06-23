@@ -7,6 +7,7 @@ type ActivityEvent = {
   id: string;
   module_key: string;
   record_label: string;
+  record_id?: string;
 };
 
 type NotificationEvent = Omit<ActivityEvent, "event_type"> & {
@@ -50,15 +51,78 @@ export async function GET() {
   // Fetch standard activity events
   const { data, error } = await supabase
     .from("activity_events")
-    .select("id,event_type,module_key,record_label,created_at")
+    .select("id,event_type,module_key,record_label,record_id,created_at")
     .order("created_at", { ascending: false })
-    .limit(12);
+    .limit(20);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  let events: NotificationEvent[] = (data ?? []) as ActivityEvent[];
+  // Filter out any orphaned events where the underlying record no longer exists
+  let events: NotificationEvent[] = [];
+  const rawEvents = (data ?? []) as ActivityEvent[];
+
+  if (rawEvents.length > 0) {
+    const customerIds = rawEvents.filter(e => e.module_key === "customers" && e.record_id).map(e => e.record_id!);
+    const deviceIds = rawEvents.filter(e => e.module_key === "inventory" && e.record_id).map(e => e.record_id!);
+    const leadIds = rawEvents.filter(e => e.module_key === "leads" && e.record_id).map(e => e.record_id!);
+    const technicianIds = rawEvents.filter(e => e.module_key === "technicians" && e.record_id).map(e => e.record_id!);
+    const ticketIds = rawEvents.filter(e => e.module_key === "support" && e.record_id).map(e => e.record_id!);
+    const workOrderIds = rawEvents.filter(e => e.module_key === "work_orders" && e.record_id).map(e => e.record_id!);
+
+    const [customersExist, devicesExist, leadsExist, techniciansExist, ticketsExist, workOrdersExist] = await Promise.all([
+      customerIds.length ? supabase.from("customers").select("id").in("id", customerIds) : Promise.resolve({ data: [] }),
+      deviceIds.length ? supabase.from("devices").select("id").in("id", deviceIds) : Promise.resolve({ data: [] }),
+      leadIds.length ? supabase.from("leads").select("id").in("id", leadIds) : Promise.resolve({ data: [] }),
+      technicianIds.length ? supabase.from("technicians").select("id").in("id", technicianIds) : Promise.resolve({ data: [] }),
+      ticketIds.length ? supabase.from("support_tickets").select("id").in("id", ticketIds) : Promise.resolve({ data: [] }),
+      workOrderIds.length ? supabase.from("work_orders").select("id").in("id", workOrderIds) : Promise.resolve({ data: [] }),
+    ]);
+
+    const validIds = new Set([
+      ...(customersExist.data ?? []).map(r => r.id),
+      ...(devicesExist.data ?? []).map(r => r.id),
+      ...(leadsExist.data ?? []).map(r => r.id),
+      ...(techniciansExist.data ?? []).map(r => r.id),
+      ...(ticketsExist.data ?? []).map(r => r.id),
+      ...(workOrdersExist.data ?? []).map(r => r.id),
+    ]);
+
+    const orphanedIds: string[] = [];
+
+    for (const event of rawEvents) {
+      if (!event.record_id) {
+        events.push(event);
+        continue;
+      }
+
+      let tableName = "";
+      if (event.module_key === "customers") tableName = "customers";
+      else if (event.module_key === "inventory") tableName = "devices";
+      else if (event.module_key === "leads") tableName = "leads";
+      else if (event.module_key === "technicians") tableName = "technicians";
+      else if (event.module_key === "support") tableName = "support_tickets";
+      else if (event.module_key === "work_orders") tableName = "work_orders";
+
+      if (tableName) {
+        if (validIds.has(event.record_id)) {
+          events.push(event);
+        } else {
+          orphanedIds.push(event.id);
+        }
+      } else {
+        events.push(event);
+      }
+    }
+
+    // Clean up orphaned events from database asynchronously
+    if (orphanedIds.length > 0) {
+      supabase.from("activity_events").delete().in("id", orphanedIds).then(({ error }) => {
+        if (error) console.error("Error deleting orphaned activity events:", error.message);
+      });
+    }
+  }
 
   // Fetch upcoming meetings
   const soon = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
