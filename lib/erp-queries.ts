@@ -84,6 +84,23 @@ function formatDateTime(value: string | null | undefined) {
   return dateTimeFormatter.format(new Date(value));
 }
 
+function mergeRowsById(
+  ...rowGroups: readonly (readonly Record<string, unknown>[] | null | undefined)[]
+) {
+  const merged = new Map<string, Record<string, unknown>>();
+
+  for (const rows of rowGroups) {
+    for (const row of rows ?? []) {
+      const id = String(row.id ?? "");
+      if (id && !merged.has(id)) {
+        merged.set(id, row);
+      }
+    }
+  }
+
+  return [...merged.values()];
+}
+
 async function countRows(
   supabase: SupabaseClient,
   table: string,
@@ -826,19 +843,47 @@ async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
 }
 
 async function leadRows(supabase: SupabaseClient, searchQuery = "") {
-  let query = supabase
+  const baseQuery = () => supabase
     .from("leads")
     .select("id,name,phone,whatsapp,source,location,vehicle_type,budget,stage,next_follow_up_at,assigned_technician_id,assigned_device_id,created_at,technicians(name),devices(imei,consignment_number,courier_company)")
     .or("assigned_technician_id.is.null,assigned_device_id.is.null")
     .order("created_at", { ascending: false });
 
   const trimmedSearch = searchQuery.trim();
+  let data: unknown[] | null = null;
+  let error: { message: string } | null = null;
+
   if (trimmedSearch) {
     const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
-    query = query.or(`name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,location.ilike.%${escapedSearch}%`);
-  }
+    const { data: matchingTechnicians, error: technicianSearchError } = await supabase
+      .from("technicians")
+      .select("id")
+      .ilike("name", `%${trimmedSearch}%`)
+      .limit(50);
 
-  const { data, error } = await query.limit(trimmedSearch ? 50 : 10);
+    if (technicianSearchError) {
+      throw technicianSearchError;
+    }
+
+    const technicianIds = (matchingTechnicians ?? [])
+      .map((technician) => String(technician.id ?? ""))
+      .filter(Boolean);
+
+    const textQuery = baseQuery()
+      .or(`name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,location.ilike.%${escapedSearch}%`)
+      .limit(50);
+    const technicianQuery = technicianIds.length
+      ? baseQuery().in("assigned_technician_id", technicianIds).limit(50)
+      : Promise.resolve({ data: [], error: null });
+
+    const [textResult, technicianResult] = await Promise.all([textQuery, technicianQuery]);
+    error = textResult.error ?? technicianResult.error;
+    data = mergeRowsById(textResult.data, technicianResult.data).slice(0, 50);
+  } else {
+    const result = await baseQuery().limit(10);
+    data = result.data;
+    error = result.error;
+  }
 
   if (error) {
     throw error;
@@ -897,20 +942,66 @@ function technicianMatchScore(customerLocation: string, technician: Record<strin
 }
 
 async function customerRows(supabase: SupabaseClient, searchQuery = "") {
-  let query = supabase
+  const baseQuery = () => supabase
     .from("customers")
     .select("id,full_name,phone,whatsapp,email,address,area,location,vehicle_type,budget,notes,source_lead_id,created_at,leads!source_lead_id(assigned_technician_id,assigned_device_id,technicians(name),devices(imei))")
     .eq("status", "active")
     .order("created_at", { ascending: false });
 
   const trimmedSearch = searchQuery.trim();
+  let data: unknown[] | null = null;
+  let error: { message: string } | null = null;
+
   if (trimmedSearch) {
     const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
-    query = query.or(`full_name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,location.ilike.%${escapedSearch}%,area.ilike.%${escapedSearch}%`);
+    const { data: matchingTechnicians, error: technicianSearchError } = await supabase
+      .from("technicians")
+      .select("id")
+      .ilike("name", `%${trimmedSearch}%`)
+      .limit(50);
+
+    if (technicianSearchError) {
+      throw technicianSearchError;
+    }
+
+    const technicianIds = (matchingTechnicians ?? [])
+      .map((technician) => String(technician.id ?? ""))
+      .filter(Boolean);
+
+    const { data: matchingLeads, error: leadSearchError } = technicianIds.length
+      ? await supabase
+          .from("leads")
+          .select("id")
+          .in("assigned_technician_id", technicianIds)
+          .limit(100)
+      : { data: [], error: null };
+
+    if (leadSearchError) {
+      throw leadSearchError;
+    }
+
+    const leadIds = (matchingLeads ?? [])
+      .map((lead) => String(lead.id ?? ""))
+      .filter(Boolean);
+
+    const textQuery = baseQuery()
+      .or(`full_name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,location.ilike.%${escapedSearch}%,area.ilike.%${escapedSearch}%`)
+      .limit(50);
+    const technicianQuery = leadIds.length
+      ? baseQuery().in("source_lead_id", leadIds).limit(50)
+      : Promise.resolve({ data: [], error: null });
+
+    const [textResult, technicianResult] = await Promise.all([textQuery, technicianQuery]);
+    error = textResult.error ?? technicianResult.error;
+    data = mergeRowsById(textResult.data, technicianResult.data).slice(0, 50);
+  } else {
+    const result = await baseQuery().limit(10);
+    data = result.data;
+    error = result.error;
   }
 
-  const [{ data, error }, { data: technicians, error: technicianError }] = await Promise.all([
-    query.limit(trimmedSearch ? 50 : 10),
+  const [customerResult, { data: technicians, error: technicianError }] = await Promise.all([
+    Promise.resolve({ data, error }),
     supabase
       .from("technicians")
       .select("id,name,cities,area_coverage,active")
@@ -918,15 +1009,15 @@ async function customerRows(supabase: SupabaseClient, searchQuery = "") {
       .order("name", { ascending: true }),
   ]);
 
-  if (error) {
-    throw error;
+  if (customerResult.error) {
+    throw customerResult.error;
   }
 
   if (technicianError) {
     throw technicianError;
   }
 
-  const rows = (data ?? []) as Record<string, unknown>[];
+  const rows = (customerResult.data ?? []) as Record<string, unknown>[];
   const customerIds = rows.map((row) => String(row.id ?? "")).filter(Boolean);
   const leadIds = rows.map((row) => String(row.source_lead_id ?? "")).filter(Boolean);
   const [followUpsByLead, installStatuses, assignedDevices] = await Promise.all([

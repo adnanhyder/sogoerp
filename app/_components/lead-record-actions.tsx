@@ -26,6 +26,14 @@ type LeadRecordActionsProps = {
   courierCompany?: string;
 };
 
+type TechnicianOption = {
+  areaCoverage: string;
+  cities: string;
+  deviceCount?: number;
+  id: string;
+  name: string;
+};
+
 const stageOptions = [
   "new_lead",
   "contacted",
@@ -82,7 +90,9 @@ export function LeadRecordActions({
   const [draftCourierCompany, setDraftCourierCompany] = useState(courierCompany);
   const [isSavingAssignment, setIsSavingAssignment] = useState(false);
   const [devices, setDevices] = useState<{ id: string; imei: string; technicianName: string; technician_id: string | null }[]>([]);
-  const [technicians, setTechnicians] = useState<{ id: string; name: string; cities: string; deviceCount?: number }[]>([]);
+  const [isTechnicianDropdownOpen, setIsTechnicianDropdownOpen] = useState(false);
+  const [technicianSearch, setTechnicianSearch] = useState("");
+  const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
 
   // Follow-up States
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
@@ -113,12 +123,107 @@ export function LeadRecordActions({
   const busy = isSavingAssignment || isSavingFollowUp || isSaving || isDeleting;
   const loading = isSavingAssignment || isSavingFollowUp || isSaving;
 
-  const filteredEditTechnicians = technicians.filter(t => {
-    if (!t.cities || !draftLocation) return false;
-    const techCities = t.cities.toLowerCase().split(',').map(c => c.trim()).filter(Boolean);
-    const loc = draftLocation.toLowerCase();
-    return techCities.some(city => loc.includes(city) || city.includes(loc));
+  const locationText = draftLocation.toLowerCase().trim();
+  const searchText = technicianSearch.toLowerCase().trim();
+  const selectedTechnician = technicians.find((technician) => technician.id === draftTechnicianId);
+  const technicianInputValue = isTechnicianDropdownOpen ? technicianSearch : selectedTechnician?.name ?? technicianSearch;
+  const cityAreaTechnicians = technicians.filter((technician) => {
+    if (!locationText) return true;
+
+    const coverage = `${technician.cities},${technician.areaCoverage}`.toLowerCase();
+    const coverageParts = coverage.split(",").map((part) => part.trim()).filter(Boolean);
+
+    return coverageParts.some((part) => locationText.includes(part) || part.includes(locationText));
   });
+  const filteredCityAreaTechnicians = cityAreaTechnicians.filter((technician) => {
+    if (!searchText) return true;
+
+    return technician.name.toLowerCase().includes(searchText);
+  });
+  const outOfAreaTechnicianMatches = searchText
+    ? technicians.filter((technician) => (
+        !cityAreaTechnicians.some((matchedTechnician) => matchedTechnician.id === technician.id) &&
+        technician.name.toLowerCase().includes(searchText)
+      ))
+    : [];
+
+  function renderTechnicianDropdown(inputClassName: string, dropdownClassName = "") {
+    const hasAnyResults = filteredCityAreaTechnicians.length > 0 || outOfAreaTechnicianMatches.length > 0;
+
+    return (
+      <div className="relative">
+        <input
+          autoComplete="off"
+          className={inputClassName}
+          onBlur={() => {
+            window.setTimeout(() => setIsTechnicianDropdownOpen(false), 120);
+          }}
+          onChange={(event) => {
+            setTechnicianSearch(event.target.value);
+            setDraftTechnicianId("");
+            setIsTechnicianDropdownOpen(true);
+          }}
+          onFocus={() => {
+            setTechnicianSearch("");
+            setIsTechnicianDropdownOpen(true);
+          }}
+          placeholder="Search technician by name..."
+          type="search"
+          value={technicianInputValue}
+        />
+        {isTechnicianDropdownOpen ? (
+          <div className={`absolute left-0 right-0 top-full z-[10010] mt-1 max-h-56 overflow-y-auto rounded-[10px] border border-gray-200 bg-white shadow-xl ${dropdownClassName}`}>
+            <button
+              className="block w-full px-3 py-2 text-left text-sm font-bold text-gray-900 transition hover:bg-gray-50"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                setDraftTechnicianId("");
+                setTechnicianSearch("");
+                setIsTechnicianDropdownOpen(false);
+              }}
+              type="button"
+            >
+              -- Unassigned --
+            </button>
+            {filteredCityAreaTechnicians.map((technician) => (
+              <button
+                className="block w-full px-3 py-2 text-left text-sm font-bold text-gray-900 transition hover:bg-[#FAC54D]/20"
+                key={technician.id}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  setDraftTechnicianId(technician.id);
+                  setTechnicianSearch(technician.name);
+                  setIsTechnicianDropdownOpen(false);
+                }}
+                type="button"
+              >
+                <span className="block">{technician.name}</span>
+                <span className="block text-[11px] font-semibold text-gray-500">
+                  {[technician.cities, technician.areaCoverage].filter(Boolean).join(" / ") || "No city or area"}
+                </span>
+              </button>
+            ))}
+            {outOfAreaTechnicianMatches.map((technician) => (
+              <div
+                className="px-3 py-2 text-left text-sm font-bold text-red-600"
+                key={technician.id}
+              >
+                <span className="block">{technician.name}</span>
+                <span className="block text-[11px] font-semibold text-red-500">
+                  This technician is not from the customer&apos;s city or area.
+                </span>
+              </div>
+            ))}
+            {!hasAnyResults ? (
+              <div className="px-3 py-2 text-sm font-bold text-amber-600">
+                No technician found for this search.
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   // Auto-open modal if specified in search parameters
   useEffect(() => {
@@ -132,8 +237,12 @@ export function LeadRecordActions({
     fetch("/api/erp/options/technicians")
       .then((r) => r.json())
       .then((payload) => {
-        const list = (payload.technicians ?? []) as { id: string; name: string; cities: string; active: boolean; deviceCount: number }[];
-        setTechnicians(list.filter((t) => t.active));
+        const list = (payload.technicians ?? []) as { areaCoverage: string; id: string; name: string; cities: string; active: boolean; deviceCount: number }[];
+        setTechnicians(
+          list
+            .filter((t) => t.active)
+            .map((t) => ({ ...t, areaCoverage: t.areaCoverage ?? "", cities: t.cities ?? "" })),
+        );
       })
       .catch(() => {});
       
@@ -362,6 +471,8 @@ export function LeadRecordActions({
             setDraftDeviceId(assignedDeviceId || "");
             setDraftConsignmentNumber(consignmentNumber || "");
             setDraftCourierCompany(courierCompany || "");
+            setIsTechnicianDropdownOpen(false);
+            setTechnicianSearch(assignedTechnicianName || "");
             setIsEditing(true);
           }}
           type="button"
@@ -380,6 +491,8 @@ export function LeadRecordActions({
             setDraftDeviceId(assignedDeviceId || "");
             setDraftConsignmentNumber(consignmentNumber || "");
             setDraftCourierCompany(courierCompany || "");
+            setIsTechnicianDropdownOpen(false);
+            setTechnicianSearch(assignedTechnicianName || "");
             setIsFollowUpOpen(true);
           }}
           type="button"
@@ -491,27 +604,13 @@ export function LeadRecordActions({
 
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold text-black">Assigned Technician</span>
-            <select
-              className="h-9 rounded-[6px] border border-[#d2d2d2] bg-white px-3 text-sm font-semibold text-black outline-none transition focus:border-black"
-              onChange={(event) => setDraftTechnicianId(event.target.value)}
-              value={draftTechnicianId}
-            >
-              <option value="">-- Unassigned --</option>
-              {filteredEditTechnicians.length > 0 ? (
-                filteredEditTechnicians.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.cities})
-                  </option>
-                ))
-              ) : (
-                <option value="" disabled>
-                  ⚠️ No technician found for this city. Please add a technician first.
-                </option>
-              )}
-            </select>
-            {filteredEditTechnicians.length === 0 && draftLocation && (
+            {renderTechnicianDropdown("h-9 w-full rounded-[6px] border border-[#d2d2d2] bg-white px-3 text-sm font-semibold text-black outline-none transition focus:border-black")}
+            <span className="text-[11px] font-bold text-gray-500 mt-1">
+              Technicians you can see are from the customer&apos;s city and area.
+            </span>
+            {cityAreaTechnicians.length === 0 && draftLocation && (
               <span className="text-[11px] font-bold text-amber-600 mt-1">
-                ⚠️ No technician found for city: &quot;{draftLocation}&quot;. Please register a technician for this city first under Technician Operations.
+                No technician found for &quot;{draftLocation}&quot;. Please register a technician for this city or area first under Technician Operations.
               </span>
             )}
           </label>
@@ -623,6 +722,35 @@ export function LeadRecordActions({
               >
                 <X className="size-5" />
               </button>
+            </div>
+
+            <div className="mb-6 rounded-[16px] border-2 border-[#FAC54D]/30 bg-[#FAC54D]/5 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-extrabold text-gray-900">Assign Technician</h4>
+                  <p className="text-[11px] font-bold text-gray-500">
+                    Technicians you can see are from the customer&apos;s city and area.
+                  </p>
+                </div>
+                <button
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-black px-4 text-xs font-bold text-white transition hover:bg-[#343434] disabled:cursor-wait disabled:opacity-60"
+                  disabled={busy}
+                  onClick={saveAssignment}
+                  type="button"
+                >
+                  {isSavingAssignment ? <LoadingSpinner className="size-3" /> : null}
+                  {isSavingAssignment ? "Saving..." : "Save Assignment"}
+                </button>
+              </div>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-gray-500">Technician</span>
+                {renderTechnicianDropdown("h-10 w-full rounded-[10px] border-2 border-gray-200 bg-white px-3 text-sm font-bold text-gray-900 outline-none transition focus:border-[#FAC54D] focus:ring-4 focus:ring-[#FAC54D]/20")}
+              </label>
+              {cityAreaTechnicians.length === 0 && draftLocation ? (
+                <p className="mt-2 text-[11px] font-bold text-amber-600">
+                  No technician found for &quot;{draftLocation}&quot;. Please register a technician for this city or area first under Technician Operations.
+                </p>
+              ) : null}
             </div>
 
             {/* Form Section */}

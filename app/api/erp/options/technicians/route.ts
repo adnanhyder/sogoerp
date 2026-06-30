@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 type TechnicianOption = {
   active: boolean;
+  area_coverage: string | null;
   cities: string | null;
   id: string;
   name: string;
@@ -21,7 +22,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("technicians")
-    .select("id,name,cities,active")
+    .select("id,name,cities,area_coverage,active")
     .order("name", { ascending: true });
 
   if (error) {
@@ -52,6 +53,7 @@ export async function GET() {
   return NextResponse.json({
     technicians: technicians.map((technician) => ({
       active: technician.active,
+      areaCoverage: technician.area_coverage ?? "",
       cities: technician.cities ?? "",
       deviceCount: deviceCounts.get(technician.id) ?? 0,
       id: technician.id,

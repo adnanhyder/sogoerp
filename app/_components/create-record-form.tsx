@@ -15,6 +15,7 @@ type CreateRecordFormProps = {
 
 type TechnicianOption = {
   active: boolean;
+  areaCoverage: string;
   cities: string;
   deviceCount: number;
   id: string;
@@ -196,13 +197,15 @@ export function CreateRecordForm({ config, onSuccess }: CreateRecordFormProps) {
       const locationVal = String(values.location || "").toLowerCase().trim();
       if (locationVal) {
         const cityMatch = technicians.some((tech) => {
-          if (!tech.active || !tech.cities) return false;
-          const techCities = tech.cities.split(",").map((c) => c.trim().toLowerCase());
-          return techCities.some((c) => locationVal.includes(c) || c.includes(locationVal));
+          if (!tech.active) return false;
+          const coverage = `${tech.cities},${tech.areaCoverage}`.toLowerCase();
+          const coverageParts = coverage.split(",").map((part) => part.trim()).filter(Boolean);
+
+          return coverageParts.some((part) => locationVal.includes(part) || part.includes(locationVal));
         });
 
         if (!cityMatch) {
-          setError("Add first a technician of that city. Currently no technician found for this city.");
+          setError("Add first a technician of that city or area. Currently no technician found for this customer location.");
           setLoading(false);
           return;
         }
