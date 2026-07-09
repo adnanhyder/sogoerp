@@ -3,6 +3,8 @@ import { createConfigs, type CreateConfig, type CreateModuleKey } from "@/lib/cr
 import { getErpUserContext, organizationPayload, requireRole } from "@/lib/erp-context";
 import { createClient } from "@/lib/supabase/server";
 
+type DuplicateMode = "replace_existing" | "skip_duplicates";
+
 function validateConsignment(courier: string, consignment: string) {
   const cleanConsignment = consignment.trim().replace(/[-\s]/g, ""); // strip hyphens or spaces
   const cLower = courier.trim().toLowerCase();
@@ -65,8 +67,91 @@ function recordLabel(values: Record<string, unknown>) {
   return String(label);
 }
 
+function cleanImei(value: unknown) {
+  return typeof value === "string" ? value.replace(/[\s.-]/g, "").trim() : "";
+}
+
+function uniqueByImei(payloads: Record<string, unknown>[], mode: DuplicateMode) {
+  if (mode === "replace_existing") {
+    const byImei = new Map<string, Record<string, unknown>>();
+    const withoutImei: Record<string, unknown>[] = [];
+
+    for (const payload of payloads) {
+      const imei = cleanImei(payload.imei);
+
+      if (imei) {
+        byImei.set(imei, payload);
+      } else {
+        withoutImei.push(payload);
+      }
+    }
+
+    return [...withoutImei, ...byImei.values()];
+  }
+
+  const seen = new Set<string>();
+
+  return payloads.filter((payload) => {
+    const imei = cleanImei(payload.imei);
+
+    if (!imei) {
+      return true;
+    }
+
+    if (seen.has(imei)) {
+      return false;
+    }
+
+    seen.add(imei);
+    return true;
+  });
+}
+
+async function removeExistingInventoryDuplicates(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string | null,
+  duplicateImeis: string[],
+) {
+  if (!organizationId || !duplicateImeis.length) {
+    return;
+  }
+
+  const { data: existingDevices, error: lookupError } = await supabase
+    .from("devices")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .in("imei", duplicateImeis);
+
+  if (lookupError) {
+    throw lookupError;
+  }
+
+  const deviceIds = (existingDevices ?? []).map((device) => String(device.id)).filter(Boolean);
+
+  if (!deviceIds.length) {
+    return;
+  }
+
+  await Promise.all([
+    supabase.from("device_transfers").delete().in("device_id", deviceIds),
+    supabase.from("leads").update({ assigned_device_id: null }).in("assigned_device_id", deviceIds),
+    supabase.from("work_orders").update({ device_id: null }).in("device_id", deviceIds),
+  ]);
+
+  const { error: deleteError } = await supabase
+    .from("devices")
+    .delete()
+    .eq("organization_id", organizationId)
+    .in("id", deviceIds);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+}
+
 export async function POST(request: Request) {
   const body = (await request.json()) as {
+    duplicateMode?: DuplicateMode;
     moduleKey?: string;
     records?: Array<Record<string, unknown>>;
   };
@@ -230,13 +315,64 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data, error } = await supabase.from(config.table).insert(payloads).select("id");
+  let finalPayloads = payloads;
+  if (moduleKey === "inventory") {
+    const csvImeis = payloads.map((payload) => cleanImei(payload.imei)).filter(Boolean);
+    const repeatedCsvImeis = csvImeis.filter((imei, index) => csvImeis.indexOf(imei) !== index);
+    const { data: existingDevices, error: existingError } = csvImeis.length
+      ? await supabase
+          .from("devices")
+          .select("imei")
+          .eq("organization_id", context.organizationId)
+          .in("imei", Array.from(new Set(csvImeis)))
+      : { data: [], error: null };
+
+    if (existingError) {
+      return NextResponse.json({ error: existingError.message }, { status: 400 });
+    }
+
+    const existingImeis = (existingDevices ?? []).map((device) => cleanImei(device.imei));
+    const duplicateImeis = Array.from(new Set([...existingImeis, ...repeatedCsvImeis])).filter(Boolean);
+
+    if (duplicateImeis.length && !body.duplicateMode) {
+      return NextResponse.json(
+        {
+          duplicateImeis,
+          duplicateCount: duplicateImeis.length,
+          error: "Duplicate IMEIs found in this CSV import.",
+          requiresDuplicateDecision: true,
+        },
+        { status: 409 },
+      );
+    }
+
+    if (body.duplicateMode === "replace_existing") {
+      try {
+        await removeExistingInventoryDuplicates(supabase, context.organizationId, duplicateImeis);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Unable to remove existing duplicate IMEIs." },
+          { status: 400 },
+        );
+      }
+      finalPayloads = uniqueByImei(payloads, "replace_existing");
+    } else if (body.duplicateMode === "skip_duplicates") {
+      const existingSet = new Set(existingImeis);
+      finalPayloads = uniqueByImei(payloads, "skip_duplicates").filter((payload) => !existingSet.has(cleanImei(payload.imei)));
+    }
+  }
+
+  if (!finalPayloads.length) {
+    return NextResponse.json({ ok: true, count: 0 });
+  }
+
+  const { data, error } = await supabase.from(config.table).insert(finalPayloads).select("id");
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  const activityEvents = payloads.map((payload, index) => ({
+  const activityEvents = finalPayloads.map((payload, index) => ({
     created_by: context.userId,
     event_type: "created",
     module_key: moduleKey,
@@ -246,5 +382,5 @@ export async function POST(request: Request) {
 
   await supabase.from("activity_events").insert(activityEvents);
 
-  return NextResponse.json({ ok: true, count: payloads.length });
+  return NextResponse.json({ ok: true, count: finalPayloads.length });
 }

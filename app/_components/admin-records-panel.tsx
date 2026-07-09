@@ -22,6 +22,14 @@ type AdminRecordsPanelProps = {
   title: string;
 };
 
+type BulkImportResult = {
+  count?: number;
+  duplicateImeis?: string[];
+  error?: string;
+  ok?: boolean;
+  requiresDuplicateDecision?: boolean;
+};
+
 function SearchButton() {
   const { pending } = useFormStatus();
 
@@ -53,6 +61,8 @@ export function AdminRecordsPanel({
   const [csvLoading, setCsvLoading] = useState(false);
   const [csvError, setCsvError] = useState("");
   const [csvSuccess, setCsvSuccess] = useState("");
+  const [duplicateImeis, setDuplicateImeis] = useState<string[]>([]);
+  const [pendingCsvRows, setPendingCsvRows] = useState<Record<string, string>[]>([]);
   const [showSampleDropdown, setShowSampleDropdown] = useState(false);
 
   const handleDownloadSample = (format: "csv" | "pdf") => {
@@ -150,6 +160,41 @@ export function AdminRecordsPanel({
     }
   };
 
+  async function importCsvRows(rows: Record<string, string>[], duplicateMode?: "replace_existing" | "skip_duplicates") {
+    setCsvLoading(true);
+    setCsvError("");
+    setCsvSuccess("");
+
+    const response = await fetch("/api/erp/bulk-create", {
+      body: JSON.stringify({
+        duplicateMode,
+        moduleKey: config?.moduleKey,
+        records: rows,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    const result = await response.json() as BulkImportResult;
+    setCsvLoading(false);
+
+    if (response.status === 409 && result.requiresDuplicateDecision) {
+      setPendingCsvRows(rows);
+      setDuplicateImeis(result.duplicateImeis ?? []);
+      return;
+    }
+
+    if (!response.ok || result.error) {
+      setCsvError(result.error ?? "Unable to import CSV records.");
+      return;
+    }
+
+    setDuplicateImeis([]);
+    setPendingCsvRows([]);
+    setCsvSuccess(`Successfully imported ${result.count} records!`);
+    router.refresh();
+  }
+
   const handleCsvImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -171,26 +216,7 @@ export function AdminRecordsPanel({
             return;
           }
 
-          const response = await fetch("/api/erp/bulk-create", {
-            body: JSON.stringify({
-              moduleKey: config?.moduleKey,
-              records: rows,
-            }),
-            headers: { "Content-Type": "application/json" },
-            method: "POST",
-          });
-          
-          const result = await response.json() as { error?: string, ok?: boolean, count?: number };
-          
-          setCsvLoading(false);
-          
-          if (!response.ok || result.error) {
-            setCsvError(result.error ?? "Unable to import CSV records.");
-            return;
-          }
-
-          setCsvSuccess(`Successfully imported ${result.count} records!`);
-          router.refresh();
+          await importCsvRows(rows);
         } catch (err) {
           setCsvError(String(err));
           setCsvLoading(false);
@@ -318,6 +344,57 @@ export function AdminRecordsPanel({
       {open ? (
         <div className="mb-5 rounded-[8px] border border-[#d2d2d2] bg-[#fbfbfb] p-4">
           {config ? <CreateRecordForm config={config} onSuccess={() => setOpen(false)} /> : null}
+        </div>
+      ) : null}
+
+      {duplicateImeis.length ? (
+        <div className="fixed inset-0 z-[10020] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[18px] bg-white p-6 shadow-2xl">
+            <div className="mb-5">
+              <h3 className="text-lg font-black text-gray-900">Duplicate IMEIs found</h3>
+              <p className="mt-1 text-sm font-semibold text-gray-500">
+                These IMEIs already exist or repeat inside the CSV. Choose how this import should continue.
+              </p>
+            </div>
+            <div className="max-h-44 overflow-y-auto rounded-[12px] border border-gray-200 bg-gray-50 p-3">
+              <div className="flex flex-wrap gap-2">
+                {duplicateImeis.map((imei) => (
+                  <span className="rounded-[6px] bg-white px-2.5 py-1 text-xs font-black text-gray-900 ring-1 ring-gray-200" key={imei}>
+                    {imei}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <button
+                className="rounded-[10px] bg-black px-4 py-3 text-sm font-black text-white transition hover:bg-gray-800 disabled:cursor-wait disabled:opacity-70"
+                disabled={csvLoading}
+                onClick={() => importCsvRows(pendingCsvRows, "replace_existing")}
+                type="button"
+              >
+                Add these, remove first
+              </button>
+              <button
+                className="rounded-[10px] border-2 border-gray-200 bg-white px-4 py-3 text-sm font-black text-gray-800 transition hover:border-black disabled:cursor-wait disabled:opacity-70"
+                disabled={csvLoading}
+                onClick={() => importCsvRows(pendingCsvRows, "skip_duplicates")}
+                type="button"
+              >
+                Remove these, keep first
+              </button>
+            </div>
+            <button
+              className="mt-3 w-full rounded-[10px] px-4 py-2 text-xs font-bold text-gray-500 transition hover:bg-gray-50 hover:text-gray-900"
+              disabled={csvLoading}
+              onClick={() => {
+                setDuplicateImeis([]);
+                setPendingCsvRows([]);
+              }}
+              type="button"
+            >
+              Cancel import
+            </button>
+          </div>
         </div>
       ) : null}
 

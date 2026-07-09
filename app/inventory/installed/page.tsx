@@ -2,12 +2,23 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ErpShell } from "@/app/_components/erp-shell";
 import { InstalledDevicesTable } from "@/app/_components/installed-devices-table";
+import { PaginationControls } from "@/app/_components/pagination-controls";
 
 export const dynamic = "force-dynamic";
 
-export default async function InstalledPage() {
+type InstalledPageProps = {
+  searchParams?: Promise<{
+    page?: string;
+  }>;
+};
+
+export default async function InstalledPage({ searchParams }: InstalledPageProps) {
   const user = await requireUser();
   const supabase = await createClient();
+  const params = await searchParams;
+  const requestedPage = Number(params?.page ?? "1");
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  const pageSize = 20;
 
   // Fetch all successfully installed devices
   const { data: allInstalled, error } = await supabase
@@ -69,6 +80,8 @@ export default async function InstalledPage() {
         : "-", // 18
     ];
   });
+  const totalRows = rows.length;
+  const paginatedRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <ErpShell activeHref="/inventory/installed" title="Inventory Installed" user={user}>
@@ -79,7 +92,14 @@ export default async function InstalledPage() {
       )}
 
       {/* Installed Devices Table */}
-      <InstalledDevicesTable columns={[]} rows={rows} />
+      <InstalledDevicesTable columns={[]} rows={paginatedRows} />
+      <PaginationControls
+        currentPage={page}
+        pageSize={pageSize}
+        path="/inventory/installed"
+        totalItems={totalRows}
+        totalPages={Math.max(1, Math.ceil(totalRows / pageSize))}
+      />
     </ErpShell>
   );
 }

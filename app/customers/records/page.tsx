@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ErpShell } from "@/app/_components/erp-shell";
 import { History } from "lucide-react";
+import { PaginationControls } from "@/app/_components/pagination-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -9,16 +10,33 @@ import { ViewDetailsModal } from "./view-details-modal";
 import { getErpUserContext } from "@/lib/erp-context";
 import { DeleteHistoryRecordButton } from "./delete-history-button";
 
-export default async function CustomersRecordPage() {
+type CustomersRecordPageProps = {
+  searchParams?: Promise<{
+    page?: string;
+  }>;
+};
+
+export default async function CustomersRecordPage({ searchParams }: CustomersRecordPageProps) {
   const user = await requireUser();
   const supabase = await createClient();
   const context = await getErpUserContext(supabase);
   const isAdmin = context.role === "admin";
+  const params = await searchParams;
+  const requestedPage = Number(params?.page ?? "1");
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  const pageSize = 20;
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { count: totalRecords } = await supabase
+    .from("customer_records_history")
+    .select("id", { count: "exact", head: true });
 
   const { data: records } = await supabase
     .from("customer_records_history")
     .select("*")
-    .order("deleted_at", { ascending: false });
+    .order("deleted_at", { ascending: false })
+    .range(from, to);
 
   return (
     <ErpShell activeHref="/customers/records" title="Customer Records History" user={user}>
@@ -112,6 +130,13 @@ export default async function CustomersRecordPage() {
           </table>
         </div>
       </div>
+      <PaginationControls
+        currentPage={page}
+        pageSize={pageSize}
+        path="/customers/records"
+        totalItems={totalRecords ?? 0}
+        totalPages={Math.max(1, Math.ceil((totalRecords ?? 0) / pageSize))}
+      />
     </ErpShell>
   );
 }

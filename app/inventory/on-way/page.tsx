@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ErpShell } from "@/app/_components/erp-shell";
 import { OnWayTable } from "./on-way-table";
 import { OnWayFilters } from "./on-way-filters";
+import { PaginationControls } from "@/app/_components/pagination-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ type OnWayPageProps = {
     q?: string;
     courier?: string;
     technician_id?: string;
+    page?: string;
   }>;
 };
 
@@ -21,6 +23,9 @@ export default async function OnWayPage({ searchParams }: OnWayPageProps) {
   const q = params?.q?.trim() ?? "";
   const courier = params?.courier?.trim() ?? "";
   const technicianId = params?.technician_id?.trim() ?? "";
+  const requestedPage = Number(params?.page ?? "1");
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  const pageSize = 20;
 
   // Fetch all on-the-way devices to calculate metrics in memory
   const { data: allOnWay, error } = await supabase
@@ -82,6 +87,9 @@ export default async function OnWayPage({ searchParams }: OnWayPageProps) {
     );
   }
 
+  const totalFilteredDevices = filteredDevices.length;
+  const paginatedDevices = filteredDevices.slice((page - 1) * pageSize, page * pageSize);
+
   return (
     <ErpShell activeHref="/inventory/on-way" title="Inventory On Way" user={user}>
       {/* Metrics Section */}
@@ -113,7 +121,15 @@ export default async function OnWayPage({ searchParams }: OnWayPageProps) {
       />
 
       {/* Table Section */}
-      <OnWayTable devices={filteredDevices as any} />
+      <OnWayTable devices={paginatedDevices as any} />
+      <PaginationControls
+        currentPage={page}
+        pageSize={pageSize}
+        path="/inventory/on-way"
+        query={{ courier, q, technician_id: technicianId }}
+        totalItems={totalFilteredDevices}
+        totalPages={Math.max(1, Math.ceil(totalFilteredDevices / pageSize))}
+      />
     </ErpShell>
   );
 }

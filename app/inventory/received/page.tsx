@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ErpShell } from "@/app/_components/erp-shell";
 import { ReceivedFilters } from "./received-filters";
+import { PaginationControls } from "@/app/_components/pagination-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ type ReceivedPageProps = {
     q?: string;
     condition?: string;
     technician_id?: string;
+    page?: string;
   }>;
 };
 
@@ -20,6 +22,9 @@ export default async function ReceivedPage({ searchParams }: ReceivedPageProps) 
   const q = params?.q?.trim() ?? "";
   const condition = params?.condition?.trim() ?? "";
   const technicianId = params?.technician_id?.trim() ?? "";
+  const requestedPage = Number(params?.page ?? "1");
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  const pageSize = 20;
 
   // Fetch all devices that have custody_status = 'received_by_technician'
   const { data: allReceived, error } = await supabase
@@ -102,6 +107,9 @@ export default async function ReceivedPage({ searchParams }: ReceivedPageProps) 
     });
   }
 
+  const totalFilteredDevices = filteredDevices.length;
+  const paginatedDevices = filteredDevices.slice((page - 1) * pageSize, page * pageSize);
+
   // Helper function for condition tag styling
   const conditionChipClass = (cond: string) => {
     const normalized = (cond || "new").toLowerCase();
@@ -153,8 +161,8 @@ export default async function ReceivedPage({ searchParams }: ReceivedPageProps) 
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredDevices.length ? (
-              filteredDevices.map((device) => {
+            {paginatedDevices.length ? (
+              paginatedDevices.map((device) => {
                 const techObj = Array.isArray(device.technicians) ? device.technicians[0] : (device.technicians as any);
                 const techName = techObj?.name || "Unknown Technician";
                 const techCities = techObj?.cities || "—";
@@ -200,6 +208,14 @@ export default async function ReceivedPage({ searchParams }: ReceivedPageProps) 
           </tbody>
         </table>
       </div>
+      <PaginationControls
+        currentPage={page}
+        pageSize={pageSize}
+        path="/inventory/received"
+        query={{ condition, q, technician_id: technicianId }}
+        totalItems={totalFilteredDevices}
+        totalPages={Math.max(1, Math.ceil(totalFilteredDevices / pageSize))}
+      />
     </ErpShell>
   );
 }

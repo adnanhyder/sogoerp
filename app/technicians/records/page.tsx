@@ -1,14 +1,25 @@
 import { requireUser } from "@/lib/auth";
 import { ErpShell } from "@/app/_components/erp-shell";
 import { createClient } from "@/lib/supabase/server";
+import { PaginationControls } from "@/app/_components/pagination-controls";
 
 export const dynamic = "force-dynamic";
 
 import { ViewDetailsModal } from "./view-details-modal";
 
-export default async function TechnicianActivityPage() {
+type TechnicianActivityPageProps = {
+  searchParams?: Promise<{
+    page?: string;
+  }>;
+};
+
+export default async function TechnicianActivityPage({ searchParams }: TechnicianActivityPageProps) {
   const user = await requireUser();
   const supabase = await createClient();
+  const params = await searchParams;
+  const requestedPage = Number(params?.page ?? "1");
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  const pageSize = 20;
 
   // Fetch recent work orders for technicians
   const { data: workOrders, error: workOrdersError } = await supabase
@@ -23,7 +34,7 @@ export default async function TechnicianActivityPage() {
     `)
     .not("technician_id", "is", null)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(200);
 
   // Fetch recent device transfers
   const { data: transfers, error: transfersError } = await supabase
@@ -38,7 +49,7 @@ export default async function TechnicianActivityPage() {
       toTech:technicians!device_transfers_to_technician_id_fkey(name)
     `)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(200);
 
   if (workOrdersError || transfersError) {
     return (
@@ -67,6 +78,7 @@ export default async function TechnicianActivityPage() {
       raw: t,
     }))
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const paginatedActivities = activities.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <ErpShell activeHref="/technicians/records" title="Technician Activity Logs" user={user}>
@@ -79,7 +91,7 @@ export default async function TechnicianActivityPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {activities.map((activity, i) => (
+            {paginatedActivities.map((activity, i) => (
               <div key={i} className="flex items-start gap-4 rounded-[12px] border border-gray-100 bg-[#fbfbfb] p-4 transition hover:bg-white hover:shadow-sm">
                 <div className={`mt-1 flex size-8 shrink-0 items-center justify-center rounded-full ${activity.type === 'work_order' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
                   {activity.type === 'work_order' ? '🛠️' : '📦'}
@@ -98,6 +110,13 @@ export default async function TechnicianActivityPage() {
             ))}
           </div>
         )}
+        <PaginationControls
+          currentPage={page}
+          pageSize={pageSize}
+          path="/technicians/records"
+          totalItems={activities.length}
+          totalPages={Math.max(1, Math.ceil(activities.length / pageSize))}
+        />
       </article>
     </ErpShell>
   );

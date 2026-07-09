@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Search, ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, Plus, Search } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { AdminRecordsPanel } from "./admin-records-panel";
 import { ErpShell } from "./erp-shell";
@@ -10,6 +10,7 @@ import { CustomerRecordActions } from "./customer-record-actions";
 import { InventoryRecordActions } from "./inventory-record-actions";
 import { LeadRecordActions } from "./lead-record-actions";
 import { TechnicianRecordActions } from "./technician-record-actions";
+import { PaginationControls } from "./pagination-controls";
 
 import { PaidCommissionsTable } from "./paid-commissions-table";
 import { CompletedCustomersTable } from "./completed-customers-table";
@@ -27,6 +28,12 @@ type ModulePageProps = {
   databaseError?: string | null;
   description: string;
   metrics: readonly ModuleMetric[];
+  pagination?: {
+    currentPage: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
   primaryAction?: string;
   searchQuery?: string;
   tableColumns: readonly string[];
@@ -68,6 +75,7 @@ export function ModulePage({
   databaseError,
   description,
   metrics,
+  pagination,
   primaryAction,
   searchQuery = "",
   tableColumns,
@@ -306,6 +314,17 @@ export function ModulePage({
     </div>
   );
 
+  const paginationControls = pagination ? (
+    <PaginationControls
+      currentPage={pagination.currentPage}
+      pageSize={pagination.pageSize}
+      path={activeHref}
+      query={{ q: searchQuery }}
+      totalItems={pagination.totalItems}
+      totalPages={pagination.totalPages}
+    />
+  ) : null;
+
   if (isCoreAdmin) {
     return (
       <ErpShell activeHref={activeHref} title={title} user={user}>
@@ -327,6 +346,7 @@ export function ModulePage({
               title={`${title} Records`}
             >
               {recordsTable}
+              {paginationControls}
             </AdminRecordsPanel>
           </article>
 
@@ -437,6 +457,7 @@ export function ModulePage({
               </div>
             )}
             {recordsTable}
+            {paginationControls}
           </article>
 
           <article className="rounded-[16px] border border-gray-100 bg-white p-6 sm:p-8 shadow-sm ring-1 ring-gray-100/50">

@@ -3,6 +3,8 @@ import { ModuleRoute } from "../_components/module-route";
 export default async function TechniciansPage(props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const searchParams = await props.searchParams;
   const q = typeof searchParams?.q === "string" ? searchParams.q : "";
-  return <ModuleRoute moduleKey="technicians" searchQuery={q} />;
+  const requestedPage = typeof searchParams?.page === "string" ? Number(searchParams.page) : 1;
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  return <ModuleRoute moduleKey="technicians" page={page} searchQuery={q} />;
 }
 

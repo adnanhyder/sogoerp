@@ -11,6 +11,7 @@ type CountQuery = {
   in: (column: string, values: readonly unknown[]) => CountQuery;
   lt: (column: string, value: unknown) => CountQuery;
   lte: (column: string, value: unknown) => CountQuery;
+  neq: (column: string, value: unknown) => CountQuery;
   or: (filters: string) => CountQuery;
 } & PromiseLike<{
   count: number | null;
@@ -41,8 +42,17 @@ export type DashboardData = {
 
 export type ModuleData = {
   metrics: { detail: string; label: string; value: string }[];
+  pagination?: {
+    currentPage: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
   rows: string[][];
 };
+
+const INVENTORY_PAGE_SIZE = 20;
+const TABLE_PAGE_SIZE = 20;
 
 const moneyFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
@@ -492,7 +502,7 @@ async function sumAllCommissions(supabase: SupabaseClient, startDate: string) {
 export async function getModuleData(
   supabase: SupabaseClient,
   key: string,
-  options: { searchQuery?: string } = {},
+  options: { page?: number; searchQuery?: string } = {},
 ): Promise<QueryResult<ModuleData>> {
   try {
     switch (key) {
@@ -502,15 +512,15 @@ export async function getModuleData(
           .toISOString()
           .slice(0, 10);
 
-        const [total, companyHands, onTheWay, withTechnicians, faulty, installed, installedThisMonth, tableRows] = await Promise.all([
+        const requestedPage = Number.isFinite(options.page) ? Math.max(1, Math.floor(options.page ?? 1)) : 1;
+        const [total, onTheWay, withTechnicians, installed, installedThisMonth, inventoryTotalItems, inventoryResult] = await Promise.all([
           countRows(supabase, "devices"),
-          countRows(supabase, "devices", (query) => query.eq("custody_status", "company_hands")),
           countRows(supabase, "devices", (query) => query.eq("custody_status", "on_the_way")),
           countRows(supabase, "devices", (query) => query.eq("custody_status", "received_by_technician")),
-          countRows(supabase, "devices", (query) => query.eq("status", "faulty")),
           countRows(supabase, "devices", (query) => query.in("status", ["installed", "activated_with_sim", "active"])),
           countRows(supabase, "devices", (query) => query.in("status", ["installed", "activated_with_sim", "active"]).gte("installation_date", monthStart)),
-          inventoryRows(supabase, options.searchQuery)
+          countInventoryRows(supabase, options.searchQuery),
+          inventoryRows(supabase, options.searchQuery, requestedPage, INVENTORY_PAGE_SIZE)
         ]);
         return {
           data: {
@@ -522,7 +532,13 @@ export async function getModuleData(
               { label: "Installed This Month", value: formatCount(installedThisMonth), detail: "Installations in current month" },
               { label: "Total Devices", value: formatCount(total - installed), detail: "Excluding installed devices" },
             ],
-            rows: tableRows,
+            pagination: {
+              currentPage: inventoryResult.currentPage,
+              pageSize: inventoryResult.pageSize,
+              totalItems: inventoryTotalItems,
+              totalPages: Math.max(1, Math.ceil(inventoryTotalItems / inventoryResult.pageSize)),
+            },
+            rows: inventoryResult.rows,
           },
           error: null,
         };
@@ -549,12 +565,14 @@ export async function getModuleData(
         };
       }
       case "leads": {
-        const [newLeads, followUpsDue, matured, total, tableRows] = await Promise.all([
+        const requestedPage = Number.isFinite(options.page) ? Math.max(1, Math.floor(options.page ?? 1)) : 1;
+        const [newLeads, followUpsDue, matured, total, visibleTotal, tableRows] = await Promise.all([
           countRows(supabase, "leads", (query) => query.eq("stage", "new_lead")),
           countRows(supabase, "leads", (query) => query.lte("next_follow_up_at", new Date().toISOString())),
           countRows(supabase, "leads", (query) => query.eq("stage", "matured")),
           countRows(supabase, "leads"),
-          leadRows(supabase, options.searchQuery)
+          countRows(supabase, "leads", (query) => query.or("assigned_technician_id.is.null,assigned_device_id.is.null")),
+          leadRows(supabase, options.searchQuery, requestedPage, TABLE_PAGE_SIZE)
         ]);
         return {
           data: {
@@ -564,18 +582,25 @@ export async function getModuleData(
               { label: "Matured Leads", value: formatCount(matured), detail: "Ready to schedule" },
               { label: "Total Leads", value: formatCount(total), detail: "All lead records" },
             ],
+            pagination: {
+              currentPage: requestedPage,
+              pageSize: TABLE_PAGE_SIZE,
+              totalItems: options.searchQuery ? tableRows.length : visibleTotal,
+              totalPages: Math.max(1, Math.ceil((options.searchQuery ? tableRows.length : visibleTotal) / TABLE_PAGE_SIZE)),
+            },
             rows: tableRows,
           },
           error: null,
         };
       }
       case "technicians": {
+        const requestedPage = Number.isFinite(options.page) ? Math.max(1, Math.floor(options.page ?? 1)) : 1;
         const [total, active, blocked, disputed, tableRows] = await Promise.all([
           countRows(supabase, "technicians"),
           countRows(supabase, "technicians", (query) => query.eq("active", true)),
           countRows(supabase, "technicians", (query) => query.eq("active", false)),
           countRows(supabase, "technicians", (query) => query.eq("disputed", true)),
-          technicianRows(supabase, options.searchQuery)
+          technicianRows(supabase, options.searchQuery, requestedPage, TABLE_PAGE_SIZE)
         ]);
         return {
           data: {
@@ -585,18 +610,26 @@ export async function getModuleData(
               { label: "Blocked", value: formatCount(blocked), detail: "Access blocked" },
               { label: "Disputed", value: formatCount(disputed), detail: "Marked for review" },
             ],
+            pagination: {
+              currentPage: requestedPage,
+              pageSize: TABLE_PAGE_SIZE,
+              totalItems: options.searchQuery ? tableRows.length : total,
+              totalPages: Math.max(1, Math.ceil((options.searchQuery ? tableRows.length : total) / TABLE_PAGE_SIZE)),
+            },
             rows: tableRows,
           },
           error: null,
         };
       }
       case "customers": {
-        const [total, meetingsDue, scheduled, completed, tableRows] = await Promise.all([
+        const requestedPage = Number.isFinite(options.page) ? Math.max(1, Math.floor(options.page ?? 1)) : 1;
+        const [total, activeTotal, meetingsDue, scheduled, completed, tableRows] = await Promise.all([
           countRows(supabase, "customers"),
+          countRows(supabase, "customers", (query) => query.eq("status", "active")),
           countRows(supabase, "customer_meetings", (query) => query.lte("scheduled_at", new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()).in("status", ["scheduled", "rescheduled"])),
           countRows(supabase, "customer_meetings", (query) => query.in("status", ["scheduled", "rescheduled"])),
           countRows(supabase, "work_orders", (query) => query.eq("status", "completed")),
-          customerRows(supabase, options.searchQuery)
+          customerRows(supabase, options.searchQuery, requestedPage, TABLE_PAGE_SIZE)
         ]);
         return {
           data: {
@@ -606,6 +639,12 @@ export async function getModuleData(
               { label: "Scheduled", value: formatCount(scheduled), detail: "Open technician meetings" },
               { label: "Completed", value: formatCount(completed), detail: "Completed installations" },
             ],
+            pagination: {
+              currentPage: requestedPage,
+              pageSize: TABLE_PAGE_SIZE,
+              totalItems: options.searchQuery ? tableRows.length : activeTotal,
+              totalPages: Math.max(1, Math.ceil((options.searchQuery ? tableRows.length : activeTotal) / TABLE_PAGE_SIZE)),
+            },
             rows: tableRows,
           },
           error: null,
@@ -694,8 +733,26 @@ function displayDeviceStatus(value: unknown) {
   return status.replaceAll("_", " ");
 }
 
-async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
+async function countInventoryRows(supabase: SupabaseClient, searchQuery = "") {
   const trimmedSearch = searchQuery.trim();
+
+  return countRows(supabase, "devices", (query) => {
+    let filteredQuery = query.neq("status", "installed");
+
+    if (trimmedSearch) {
+      const escapedSearch = trimmedSearch.replaceAll(",", "\\,");
+      filteredQuery = filteredQuery.or(`imei.ilike.%${escapedSearch}%`);
+    }
+
+    return filteredQuery;
+  });
+}
+
+async function inventoryRows(supabase: SupabaseClient, searchQuery = "", page = 1, pageSize = INVENTORY_PAGE_SIZE) {
+  const trimmedSearch = searchQuery.trim();
+  const currentPage = Math.max(1, Math.floor(page));
+  const from = (currentPage - 1) * pageSize;
+  const to = from + pageSize - 1;
 
   const buildQuery = (withSentBy: boolean) => {
     const selectFields = withSentBy
@@ -705,6 +762,7 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
     let q = supabase
       .from("devices")
       .select(selectFields)
+      .neq("status", "installed")
       .order("created_at", { ascending: false });
 
     if (trimmedSearch) {
@@ -712,7 +770,7 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
       q = q.or(`imei.ilike.%${escapedSearch}%`);
     }
 
-    return q.limit(trimmedSearch ? 50 : 10);
+    return q.range(from, to);
   };
 
   // Try full query with sent_by join; fall back if column doesn't exist yet
@@ -740,7 +798,10 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
   );
   const technicianDeviceCounts = await deviceCountsByTechnician(supabase, technicianIds);
 
-  return rows.map((row) => {
+  return {
+    currentPage,
+    pageSize,
+    rows: rows.map((row) => {
     const technicianId = typeof row.technician_id === "string" ? row.technician_id : "";
     const sentByTechId = hasSentBy && typeof row.sent_by_technician_id === "string" ? row.sent_by_technician_id : "";
     const sentByRaw = hasSentBy ? row.sent_by as Record<string, unknown> | null : null;
@@ -773,7 +834,8 @@ async function inventoryRows(supabase: SupabaseClient, searchQuery = "") {
       String(row.dispatched_at ?? ""), // 23: dispatched_at
       String(row.received_at ?? ""), // 24: received_at
     ];
-  });
+    }),
+  };
 }
 
 
@@ -785,7 +847,9 @@ function technicianStatus(active: unknown, disputed: unknown) {
   return active ? "Active" : "Blocked";
 }
 
-async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
+async function technicianRows(supabase: SupabaseClient, searchQuery = "", page = 1, pageSize = TABLE_PAGE_SIZE) {
+  const from = (Math.max(1, Math.floor(page)) - 1) * pageSize;
+  const to = from + pageSize - 1;
   let query = supabase
     .from("technicians")
     .select("id,name,cnic,cities,phone,authorization_person_name,authorization_person_phone,authorization_person_cnic,authorization_relation,commission_rate,active,disputed,dispute_reason,created_at")
@@ -797,7 +861,7 @@ async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
     query = query.or(`name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,cities.ilike.%${escapedSearch}%,cnic.ilike.%${escapedSearch}%`);
   }
 
-  const { data, error } = await query.limit(trimmedSearch ? 50 : 10);
+  const { data, error } = await query.range(from, to);
 
   if (error) {
     throw error;
@@ -842,7 +906,9 @@ async function technicianRows(supabase: SupabaseClient, searchQuery = "") {
   });
 }
 
-async function leadRows(supabase: SupabaseClient, searchQuery = "") {
+async function leadRows(supabase: SupabaseClient, searchQuery = "", page = 1, pageSize = TABLE_PAGE_SIZE) {
+  const from = (Math.max(1, Math.floor(page)) - 1) * pageSize;
+  const to = from + pageSize - 1;
   const baseQuery = () => supabase
     .from("leads")
     .select("id,name,phone,whatsapp,source,location,vehicle_type,budget,stage,next_follow_up_at,assigned_technician_id,assigned_device_id,created_at,technicians(name),devices(imei,consignment_number,courier_company)")
@@ -871,16 +937,16 @@ async function leadRows(supabase: SupabaseClient, searchQuery = "") {
 
     const textQuery = baseQuery()
       .or(`name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,location.ilike.%${escapedSearch}%`)
-      .limit(50);
+      .range(from, to);
     const technicianQuery = technicianIds.length
-      ? baseQuery().in("assigned_technician_id", technicianIds).limit(50)
+      ? baseQuery().in("assigned_technician_id", technicianIds).range(from, to)
       : Promise.resolve({ data: [], error: null });
 
     const [textResult, technicianResult] = await Promise.all([textQuery, technicianQuery]);
     error = textResult.error ?? technicianResult.error;
-    data = mergeRowsById(textResult.data, technicianResult.data).slice(0, 50);
+    data = mergeRowsById(textResult.data, technicianResult.data).slice(0, pageSize);
   } else {
-    const result = await baseQuery().limit(10);
+    const result = await baseQuery().range(from, to);
     data = result.data;
     error = result.error;
   }
@@ -941,7 +1007,9 @@ function technicianMatchScore(customerLocation: string, technician: Record<strin
   return locationTokens.filter((part) => coverage.has(part)).length;
 }
 
-async function customerRows(supabase: SupabaseClient, searchQuery = "") {
+async function customerRows(supabase: SupabaseClient, searchQuery = "", page = 1, pageSize = TABLE_PAGE_SIZE) {
+  const from = (Math.max(1, Math.floor(page)) - 1) * pageSize;
+  const to = from + pageSize - 1;
   const baseQuery = () => supabase
     .from("customers")
     .select("id,full_name,phone,whatsapp,email,address,area,location,vehicle_type,budget,notes,source_lead_id,created_at,leads!source_lead_id(assigned_technician_id,assigned_device_id,technicians(name),devices(imei))")
@@ -986,16 +1054,16 @@ async function customerRows(supabase: SupabaseClient, searchQuery = "") {
 
     const textQuery = baseQuery()
       .or(`full_name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,location.ilike.%${escapedSearch}%,area.ilike.%${escapedSearch}%`)
-      .limit(50);
+      .range(from, to);
     const technicianQuery = leadIds.length
-      ? baseQuery().in("source_lead_id", leadIds).limit(50)
+      ? baseQuery().in("source_lead_id", leadIds).range(from, to)
       : Promise.resolve({ data: [], error: null });
 
     const [textResult, technicianResult] = await Promise.all([textQuery, technicianQuery]);
     error = textResult.error ?? technicianResult.error;
-    data = mergeRowsById(textResult.data, technicianResult.data).slice(0, 50);
+    data = mergeRowsById(textResult.data, technicianResult.data).slice(0, pageSize);
   } else {
-    const result = await baseQuery().limit(10);
+    const result = await baseQuery().range(from, to);
     data = result.data;
     error = result.error;
   }

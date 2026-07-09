@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ErpShell } from "@/app/_components/erp-shell";
 import { InStockTable } from "./in-stock-table";
 import { InStockFilters } from "./in-stock-filters";
+import { PaginationControls } from "@/app/_components/pagination-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ type InStockPageProps = {
     q?: string;
     condition?: string;
     has_mic?: string;
+    page?: string;
   }>;
 };
 
@@ -21,6 +23,9 @@ export default async function InStockPage({ searchParams }: InStockPageProps) {
   const q = params?.q?.trim() ?? "";
   const condition = params?.condition?.trim() ?? "";
   const hasMicParam = params?.has_mic?.trim() ?? "";
+  const requestedPage = Number(params?.page ?? "1");
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  const pageSize = 20;
 
   // Fetch all in-stock devices to calculate metrics in memory
   const { data: allInStock, error: metricsError } = await supabase
@@ -51,6 +56,9 @@ export default async function InStockPage({ searchParams }: InStockPageProps) {
     const searchLower = q.toLowerCase();
     filteredDevices = filteredDevices.filter((d) => d.imei.toLowerCase().includes(searchLower));
   }
+
+  const totalFilteredDevices = filteredDevices.length;
+  const paginatedDevices = filteredDevices.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <ErpShell activeHref="/inventory/in-stock" title="Inventory In Stock" user={user}>
@@ -86,7 +94,15 @@ export default async function InStockPage({ searchParams }: InStockPageProps) {
       />
 
       {/* Table Section */}
-      <InStockTable devices={filteredDevices} />
+      <InStockTable devices={paginatedDevices} />
+      <PaginationControls
+        currentPage={page}
+        pageSize={pageSize}
+        path="/inventory/in-stock"
+        query={{ condition, has_mic: hasMicParam, q }}
+        totalItems={totalFilteredDevices}
+        totalPages={Math.max(1, Math.ceil(totalFilteredDevices / pageSize))}
+      />
     </ErpShell>
   );
 }

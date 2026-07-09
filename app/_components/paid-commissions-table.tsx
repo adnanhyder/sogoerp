@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Banknote, CheckCircle2, Search, X, Receipt } from "lucide-react";
+import { Banknote, CheckCircle2, ChevronLeft, ChevronRight, Search, X, Receipt } from "lucide-react";
 import { LoadingSpinner } from "./loading-spinner";
 
 type PaidCommission = {
@@ -19,6 +19,7 @@ export function PaidCommissionsTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [commissions, setCommissions] = useState<PaidCommission[]>([]);
+  const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedReceiptUrl, setSelectedReceiptUrl] = useState<string | null>(null);
 
@@ -58,6 +59,10 @@ export function PaidCommissionsTable() {
     return techName.includes(term) || reason.includes(term);
   });
 
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(filteredCommissions.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedCommissions = filteredCommissions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const totalPaid = filteredCommissions.reduce((sum, c) => sum + c.amount, 0);
 
   return (
@@ -83,12 +88,18 @@ export function PaidCommissionsTable() {
             type="text"
             placeholder="Filter by technician or reason..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
             className="w-full pl-9 pr-4 py-2 text-xs font-semibold rounded-[8px] border border-gray-200 bg-[#fbfbfb] text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[#FAC54D] focus:bg-white focus:ring-2 focus:ring-[#FAC54D]/10"
           />
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery("")}
+              onClick={() => {
+                setSearchQuery("");
+                setPage(1);
+              }}
               className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
             >
               <X className="size-3" />
@@ -129,9 +140,9 @@ export function PaidCommissionsTable() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredCommissions.map((c, idx) => (
+              {paginatedCommissions.map((c, idx) => (
                 <tr key={c.id} className="hover:bg-[#fbfbfb]/80 transition-colors">
-                  <td className="whitespace-nowrap px-6 py-4.5 text-xs font-bold text-gray-400">{idx + 1}</td>
+                  <td className="whitespace-nowrap px-6 py-4.5 text-xs font-bold text-gray-400">{(currentPage - 1) * pageSize + idx + 1}</td>
                   <td className="whitespace-nowrap px-6 py-4.5">
                     <span className="font-bold text-black">{c.technicians?.name ?? "Unknown Tech"}</span>
                   </td>
@@ -181,6 +192,53 @@ export function PaidCommissionsTable() {
               </tr>
             </tfoot>
           </table>
+          {filteredCommissions.length > pageSize ? (
+            <div className="flex flex-col gap-4 border-t border-gray-100 bg-[#fbfbfb] p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="px-1">
+                <p className="text-sm font-black text-gray-900">Page {currentPage} of {totalPages}</p>
+                <p className="mt-0.5 text-xs font-bold text-gray-500">
+                  Showing {(currentPage - 1) * pageSize + 1}
+                  {"-"}
+                  {Math.min(currentPage * pageSize, filteredCommissions.length)} of {filteredCommissions.length} records
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 rounded-[12px] border border-gray-200 bg-white p-1 shadow-inner">
+                <button
+                  className="inline-flex h-9 items-center justify-center gap-1 rounded-[8px] px-3 text-xs font-black text-gray-700 transition hover:bg-gray-100 hover:text-black disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-white"
+                  disabled={currentPage === 1}
+                  onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  type="button"
+                >
+                  <ChevronLeft className="size-4" />
+                  Prev
+                </button>
+                <div className="mx-1 h-6 w-px bg-gray-100" />
+                {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                  <button
+                    aria-current={pageNumber === currentPage ? "page" : undefined}
+                    className={`inline-flex size-9 items-center justify-center rounded-[8px] text-xs font-black transition ${
+                      pageNumber === currentPage ? "bg-black text-white shadow-sm" : "text-gray-700 hover:bg-gray-100 hover:text-black"
+                    }`}
+                    key={pageNumber}
+                    onClick={() => setPage(pageNumber)}
+                    type="button"
+                  >
+                    {pageNumber}
+                  </button>
+                ))}
+                <div className="mx-1 h-6 w-px bg-gray-100" />
+                <button
+                  className="inline-flex h-9 items-center justify-center gap-1 rounded-[8px] px-3 text-xs font-black text-gray-700 transition hover:bg-gray-100 hover:text-black disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-white"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  type="button"
+                >
+                  Next
+                  <ChevronRight className="size-4" />
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
 
